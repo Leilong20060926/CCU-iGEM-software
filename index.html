@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="pageTitle">LimoneneCOBRA · dFBA 控制台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<style>
+:root {
+  --bg-deep: #12211d;
+  --bg-panel: #192e28;
+  --bg-panel-raised: #203830;
+  --border: #2c443c;
+  --border-soft: #24382f;
+  --text: #edf3ee;
+  --text-muted: #93a69d;
+  --accent: #e8a33d;      /* 限烯烴油色：琥珀金 */
+  --accent-soft: #e8a33d33;
+  --leaf: #8fbf6b;        /* 果皮綠，作為輔助色 */
+  --danger: #d9756a;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg-deep);
+  background-image:
+    radial-gradient(circle at 15% 0%, #1b3830 0%, transparent 45%),
+    radial-gradient(circle at 100% 100%, #17281f 0%, transparent 55%);
+  color: var(--text);
+  font-family: var(--font-display);
+}
+
+.console {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 32px 64px;
+}
+
+/* ---------- Header ---------- */
+.console__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+}
+
+.header__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--leaf);
+  text-transform: uppercase;
+}
+
+.header__title h1 {
+  margin: 6px 0 0;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.header__accent { color: var(--accent); }
+
+.header__status {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot--pending { background: var(--text-muted); }
+.dot--ok { background: var(--leaf); box-shadow: 0 0 8px var(--leaf); }
+.dot--err { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+.header__right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.lang-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  background: var(--bg-panel);
+}
+
+.lang-toggle__btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+
+.lang-toggle__btn.is-active {
+  background: var(--accent);
+  color: #1b1204;
+}
+
+/* ---------- Mode tabs ---------- */
+.mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.mode-tab {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+
+.mode-tab:hover { border-color: var(--accent); }
+
+.mode-tab.is-active {
+  background: var(--bg-panel-raised);
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+.mode-tab__label {
+  display: block;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
+.mode-tab.is-active .mode-tab__label { color: var(--accent); }
+
+.mode-tab__desc {
+  display: block;
+  font-size: 12px;
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+/* ---------- Layout ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 880px) {
+  .layout { grid-template-columns: 1fr; }
+}
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 22px;
+}
+
+.field-group { margin-bottom: 22px; }
+.field-group:last-of-type { margin-bottom: 18px; }
+
+.field-group__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--border-soft);
+}
+
+.field { margin-bottom: 12px; }
+
+.field label {
+  display: block;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 10px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color .15s ease;
+}
+
+.field input:focus,
+.field select:focus { border-color: var(--accent); }
+
+.run-btn {
+  width: 100%;
+  background: var(--accent);
+  color: #1b1204;
+  border: none;
+  border-radius: 8px;
+  padding: 13px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: filter .15s ease, transform .05s ease;
+}
+.run-btn:hover { filter: brightness(1.08); }
+.run-btn:active { transform: translateY(1px); }
+.run-btn:disabled { opacity: 0.5; cursor: wait; }
+
+/* ---------- Secondary buttons / toolbars ---------- */
+.btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-sm {
+  background: var(--bg-panel-raised);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color .15s ease, color .15s ease;
+  white-space: nowrap;
+}
+.btn-sm:hover { border-color: var(--accent); color: var(--text); }
+.btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-sm--accent { border-color: var(--accent); color: var(--accent); }
+
+.preset-row {
+  display: flex;
+  gap: 8px;
+}
+.preset-row select { flex: 1 1 auto; }
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.checkbox-field input { width: auto; accent-color: var(--accent); }
+
+.result-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.hint {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  min-height: 18px;
+  margin: 12px 2px 0;
+  line-height: 1.5;
+}
+.hint--error { color: var(--danger); }
+
+/* ---------- Results ---------- */
+.panel--results { min-height: 520px; }
+
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.metric {
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.metric__label {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.metric__value {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.metric__value--accent { color: var(--accent); }
+
+.chart {
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  margin-bottom: 16px;
+  min-height: 320px;
+}
+
+.result-block:empty::before { content: ""; }
+
+</style>
+</head>
+<body>
+
+<div class="console">
+
+  <header class="console__header">
+    <div class="header__title">
+      <span class="header__eyebrow" data-i18n="eyebrow">iEC1356_Bl21DE3 · T7 誘導表現系統</span>
+      <h1>LimoneneCOBRA <span class="header__accent" data-i18n="headerAccent">dFBA 控制台</span></h1>
+    </div>
+    <div class="header__right">
+      <div class="header__status" id="modelStatus">
+        <span class="dot dot--pending"></span> <span data-i18n="checking">檢查模型中…</span>
+      </div>
+      <div class="lang-toggle" id="langToggle">
+        <button class="lang-toggle__btn is-active" data-lang="zh">中</button>
+        <button class="lang-toggle__btn" data-lang="en">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="mode-tabs" id="modeTabs">
+    <button class="mode-tab is-active" data-mode="fba">
+      <span class="mode-tab__label">FBA</span>
+      <span class="mode-tab__desc" data-i18n="modeFbaDesc">單一時間點穩態通量</span>
+    </button>
+    <button class="mode-tab" data-mode="dfba">
+      <span class="mode-tab__label">dFBA</span>
+      <span class="mode-tab__desc" data-i18n="modeDfbaDesc">誘導後動態時間序列</span>
+    </button>
+    <button class="mode-tab" data-mode="scan">
+      <span class="mode-tab__label" data-i18n="modeScanLabel">Etot 掃描</span>
+      <span class="mode-tab__desc" data-i18n="modeScanDesc">單酵素 OAT 廣域掃描</span>
+    </button>
+    <button class="mode-tab" data-mode="scan2d">
+      <span class="mode-tab__label" data-i18n="modeScan2dLabel">雙酵素掃描</span>
+      <span class="mode-tab__desc" data-i18n="modeScan2dDesc">雙酵素交叉掃描 (2D)</span>
+    </button>
+  </nav>
+
+  <main class="layout">
+
+    <!-- ============ 左側：參數面板 ============ -->
+    <section class="panel panel--controls">
+
+      <div class="field-group">
+        <h2 class="field-group__title" data-i18n="presetTitle">參數預設集（本機儲存）</h2>
+        <div class="preset-row" style="margin-bottom: 8px;">
+          <select id="presetSelect">
+            <option value="" data-i18n="presetNone">— 選擇已儲存的預設 —</option>
+          </select>
+        </div>
+        <div class="preset-row">
+          <input type="text" id="presetName" data-i18n-placeholder="presetNamePlaceholder" placeholder="預設名稱">
+          <button class="btn-sm" id="presetSaveBtn" data-i18n="presetSave">儲存</button>
+        </div>
+        <div class="btn-row" style="margin-top: 8px;">
+          <button class="btn-sm" id="presetLoadBtn" data-i18n="presetLoad">載入</button>
+          <button class="btn-sm" id="presetDeleteBtn" data-i18n="presetDelete">刪除</button>
+          <button class="btn-sm" id="shareLinkBtn" data-i18n="shareLink">複製分享連結</button>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <h2 class="field-group__title" data-i18n="etotTitle">酵素總濃度 Etot (µM)</h2>
+        <div class="field" data-enzyme="DXS">
+          <label for="etot-DXS">DXS</label>
+          <input type="number" id="etot-DXS" step="0.01" min="0">
+        </div>
+        <div class="field" data-enzyme="IDI">
+          <label for="etot-IDI">IDI</label>
+          <input type="number" id="etot-IDI" step="0.01" min="0">
+        </div>
+        <div class="field" data-enzyme="GPPS">
+          <label for="etot-GPPS">GPPS</label>
+          <input type="number" id="etot-GPPS" step="0.01" min="0">
+        </div>
+        <div class="field" data-enzyme="LS">
+          <label for="etot-LS" data-i18n="lsLabel">LS（檸檬烯合成酶）</label>
+          <input type="number" id="etot-LS" step="0.01" min="0">
+        </div>
+      </div>
+
+      <div class="field-group" id="scanFieldGroup" hidden>
+        <h2 class="field-group__title" data-i18n="scanTitle">掃描設定</h2>
+        <div class="field">
+          <label for="scanEnzyme" data-i18n="scanEnzymeLabel">掃描酵素</label>
+          <select id="scanEnzyme">
+            <option value="DXS">DXS</option>
+            <option value="IDI">IDI</option>
+            <option value="GPPS">GPPS</option>
+            <option value="LS" selected>LS</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="scanValues" data-i18n="scanValuesLabel">倍率／濃度序列 (µM，以逗號分隔)</label>
+          <input type="text" id="scanValues" placeholder="0.03, 0.3, 3, 30, 300">
+        </div>
+      </div>
+
+      <div class="field-group" id="scan2dFieldGroup" hidden>
+        <h2 class="field-group__title" data-i18n="scan2dTitle">雙酵素掃描設定</h2>
+        <div class="field">
+          <label for="scanEnzymeX" data-i18n="scanEnzymeXLabel">X 軸酵素</label>
+          <select id="scanEnzymeX">
+            <option value="DXS">DXS</option>
+            <option value="IDI">IDI</option>
+            <option value="GPPS">GPPS</option>
+            <option value="LS" selected>LS</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="scanValuesX" data-i18n="scanValuesXLabel">X 軸濃度序列 (µM，以逗號分隔)</label>
+          <input type="text" id="scanValuesX" placeholder="0.03, 0.3, 3, 30, 300">
+        </div>
+        <div class="field">
+          <label for="scanEnzymeY" data-i18n="scanEnzymeYLabel">Y 軸酵素</label>
+          <select id="scanEnzymeY">
+            <option value="DXS" selected>DXS</option>
+            <option value="IDI">IDI</option>
+            <option value="GPPS">GPPS</option>
+            <option value="LS">LS</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="scanValuesY" data-i18n="scanValuesYLabel">Y 軸濃度序列 (µM，以逗號分隔)</label>
+          <input type="text" id="scanValuesY" placeholder="0.03, 0.3, 3, 30, 300">
+        </div>
+      </div>
+
+      <div class="field-group">
+        <h2 class="field-group__title" data-i18n="inductionTitle">誘導與生長設定</h2>
+        <div class="field" id="inducedField">
+          <label for="induced" data-i18n="inducedLabel">誘導狀態</label>
+          <select id="induced">
+            <option value="true" data-i18n="inducedTrue">已加 IPTG（誘導後）</option>
+            <option value="false" data-i18n="inducedFalse">未誘導</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="iptgTime" data-i18n="iptgTimeLabel">IPTG 加入時間 (h)</label>
+          <input type="number" id="iptgTime" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="minGrowthFrac" data-i18n="minGrowthFracLabel">誘導後最低生長比例</label>
+          <input type="number" id="minGrowthFrac" step="0.01" min="0" max="1">
+        </div>
+        <div class="field" id="durationField">
+          <label for="totalTime" data-i18n="totalTimeLabel">模擬總時長 (h)</label>
+          <input type="number" id="totalTime" step="0.5" min="0.5">
+        </div>
+      </div>
+
+      <div class="checkbox-field" id="compareField" hidden>
+        <input type="checkbox" id="compareToggle">
+        <label for="compareToggle" data-i18n="compareToggleLabel">保留先前結果疊加比較</label>
+      </div>
+
+      <button class="run-btn" id="runBtn">
+        <span id="runBtnLabel">執行 FBA</span>
+      </button>
+
+      <div class="btn-row" id="compareClearRow" style="margin-top: 8px;" hidden>
+        <button class="btn-sm" id="compareClearBtn" data-i18n="compareClear">清除疊加結果</button>
+      </div>
+
+      <p class="hint" id="statusHint"></p>
+    </section>
+
+    <!-- ============ 右側：結果 ============ -->
+    <section class="panel panel--results">
+
+      <div id="fbaResults" class="result-block">
+        <div class="result-toolbar">
+          <button class="btn-sm" data-export-csv="fba" data-i18n="exportCsv">匯出 CSV</button>
+          <button class="btn-sm" data-export-png="fbaResults" data-i18n="exportPng">匯出圖片</button>
+        </div>
+        <div class="metric-row">
+          <div class="metric">
+            <span class="metric__label" data-i18n="muMaxLabel">最大生長速率 μmax</span>
+            <span class="metric__value" id="mMuMax">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric__label" data-i18n="muLabel">生產階段生長速率</span>
+            <span class="metric__value" id="mMu">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric__label" data-i18n="limFluxLabel">限烯烴分泌通量</span>
+            <span class="metric__value metric__value--accent" id="mLimFlux">—</span>
+          </div>
+        </div>
+        <div id="fbaEnzymeChart" class="chart"></div>
+      </div>
+
+      <div id="dfbaResults" class="result-block" hidden>
+        <div class="result-toolbar">
+          <button class="btn-sm" data-export-csv="dfba" data-i18n="exportCsv">匯出 CSV</button>
+          <button class="btn-sm" data-export-png="dfbaResults" data-i18n="exportPng">匯出圖片</button>
+        </div>
+        <div id="dfbaConcChart" class="chart"></div>
+        <div id="dfbaFluxChart" class="chart"></div>
+      </div>
+
+      <div id="scanResults" class="result-block" hidden>
+        <div class="result-toolbar">
+          <button class="btn-sm" data-export-csv="scan" data-i18n="exportCsv">匯出 CSV</button>
+          <button class="btn-sm" data-export-png="scanResults" data-i18n="exportPng">匯出圖片</button>
+        </div>
+        <div id="scanTrajChart" class="chart"></div>
+        <div id="scanEndpointChart" class="chart"></div>
+      </div>
+
+      <div id="scan2dResults" class="result-block" hidden>
+        <div class="result-toolbar">
+          <button class="btn-sm" data-export-csv="scan2d" data-i18n="exportCsv">匯出 CSV</button>
+          <button class="btn-sm" data-export-png="scan2dResults" data-i18n="exportPng">匯出圖片</button>
+        </div>
+        <div id="scan2dFinalHeatmap" class="chart"></div>
+        <div id="scan2dFluxHeatmap" class="chart"></div>
+      </div>
+
+    </section>
+  </main>
+</div>
+
+<script>
+const API_BASE = "";
+
+/* ================= i18n ================= */
+const I18N = {
+  zh: {
+    pageTitle: "LimoneneCOBRA · dFBA 控制台",
+    eyebrow: "iEC1356_Bl21DE3 · T7 誘導表現系統",
+    headerAccent: "dFBA 控制台",
+    checking: "檢查模型中…",
+    ready: "模型與參數已就緒",
+    connectError: (msg) => `無法連線後端：${msg}`,
+    modeFbaDesc: "單一時間點穩態通量",
+    modeDfbaDesc: "誘導後動態時間序列",
+    modeScanLabel: "Etot 掃描",
+    modeScanDesc: "單酵素 OAT 廣域掃描",
+    modeScan2dLabel: "雙酵素掃描",
+    modeScan2dDesc: "雙酵素交叉掃描 (2D)",
+    etotTitle: "酵素總濃度 Etot (µM)",
+    lsLabel: "LS（檸檬烯合成酶）",
+    scanTitle: "掃描設定",
+    scanEnzymeLabel: "掃描酵素",
+    scanValuesLabel: "倍率／濃度序列 (µM，以逗號分隔)",
+    scan2dTitle: "雙酵素掃描設定",
+    scanEnzymeXLabel: "X 軸酵素",
+    scanValuesXLabel: "X 軸濃度序列 (µM，以逗號分隔)",
+    scanEnzymeYLabel: "Y 軸酵素",
+    scanValuesYLabel: "Y 軸濃度序列 (µM，以逗號分隔)",
+    inductionTitle: "誘導與生長設定",
+    inducedLabel: "誘導狀態",
+    inducedTrue: "已加 IPTG（誘導後）",
+    inducedFalse: "未誘導",
+    iptgTimeLabel: "IPTG 加入時間 (h)",
+    minGrowthFracLabel: "誘導後最低生長比例",
+    totalTimeLabel: "模擬總時長 (h)",
+    muMaxLabel: "最大生長速率 μmax",
+    muLabel: "生產階段生長速率",
+    limFluxLabel: "限烯烴分泌通量",
+    runFba: "執行 FBA",
+    runDfba: "執行 dFBA 模擬",
+    runScan: "執行 Etot 掃描",
+    runScan2d: "執行雙酵素掃描",
+    computing: "計算中…（dFBA / 掃描可能需要數十秒，2D 掃描可能需數分鐘）",
+    done: "完成。",
+    errorPrefix: (msg) => `錯誤：${msg}`,
+    solverStatus: (s) => `求解狀態：${s}`,
+    stoppedEarly: (reason) => `模擬提前停止：${reason}`,
+    enzymeFluxChart: "異源酵素反應通量 (mmol/gDW/h)",
+    concChartTitle: "濃度時間曲線",
+    fluxChartTitle: "誘導後通量與生長速率",
+    timeAxis: "時間 (h)",
+    limoneneAxis: "限烯烴 (mM)",
+    biomassAxis: "生物量 (gDW/L)",
+    glycerolAxis: "甘油 (mM)",
+    limoneneLegend: "限烯烴 (mM)",
+    biomassLegend: "生物量 (gDW/L)",
+    glycerolLegend: "甘油 (mM)",
+    limFluxLegend: "限烯烴通量",
+    growthRateLegend: "生長速率 μ",
+    scanTrajTitle: (enzyme) => `${enzyme} Etot 掃描：限烯烴累積曲線`,
+    extracellularLimAxis: "細胞外限烯烴 (mM)",
+    scanEndpointTitle: (enzyme) => `${enzyme}：通量與終點濃度 vs Etot`,
+    maxFluxLegend: "最大誘導後通量",
+    finalLimLegend: "終點限烯烴濃度",
+    scan2dFinalTitle: (x, y) => `終點限烯烴濃度 (mM)：${x} × ${y}`,
+    scan2dFluxTitle: (x, y) => `最大誘導後通量 (mmol/gDW/h)：${x} × ${y}`,
+    scan2dSameEnzymeError: "X 軸與 Y 軸酵素不可相同",
+    presetTitle: "參數預設集（本機儲存）",
+    presetNone: "— 選擇已儲存的預設 —",
+    presetNamePlaceholder: "預設名稱",
+    presetSave: "儲存",
+    presetLoad: "載入",
+    presetDelete: "刪除",
+    presetSavedMsg: (name) => `已儲存預設「${name}」`,
+    presetLoadedMsg: (name) => `已載入預設「${name}」`,
+    presetDeletedMsg: (name) => `已刪除預設「${name}」`,
+    presetNameRequired: "請先輸入預設名稱",
+    presetSelectRequired: "請先選擇一個預設",
+    shareLink: "複製分享連結",
+    shareLinkCopied: "分享連結已複製到剪貼簿",
+    compareToggleLabel: "保留先前結果疊加比較",
+    compareClear: "清除疊加結果",
+    compareClearedMsg: "已清除疊加結果",
+    exportCsv: "匯出 CSV",
+    exportPng: "匯出圖片",
+    exportNoData: "尚無可匯出的結果，請先執行一次",
+    compareRunLabel: (n) => `第 ${n} 次`,
+  },
+  en: {
+    pageTitle: "LimoneneCOBRA · dFBA Console",
+    eyebrow: "iEC1356_Bl21DE3 · T7 Induction System",
+    headerAccent: "dFBA Console",
+    checking: "Checking model…",
+    ready: "Model & parameters ready",
+    connectError: (msg) => `Could not reach backend: ${msg}`,
+    modeFbaDesc: "Single time-point steady-state flux",
+    modeDfbaDesc: "Post-induction dynamic time series",
+    modeScanLabel: "Etot Scan",
+    modeScanDesc: "Single-enzyme OAT wide-range scan",
+    modeScan2dLabel: "Dual-Enzyme Scan",
+    modeScan2dDesc: "Cross-scan two enzymes (2D)",
+    etotTitle: "Total Enzyme Concentration Etot (µM)",
+    lsLabel: "LS (Limonene Synthase)",
+    scanTitle: "Scan Settings",
+    scanEnzymeLabel: "Scan Enzyme",
+    scanValuesLabel: "Value series (µM, comma-separated)",
+    scan2dTitle: "Dual-Enzyme Scan Settings",
+    scanEnzymeXLabel: "X-axis Enzyme",
+    scanValuesXLabel: "X-axis value series (µM, comma-separated)",
+    scanEnzymeYLabel: "Y-axis Enzyme",
+    scanValuesYLabel: "Y-axis value series (µM, comma-separated)",
+    inductionTitle: "Induction & Growth Settings",
+    inducedLabel: "Induction State",
+    inducedTrue: "IPTG added (post-induction)",
+    inducedFalse: "Pre-induction",
+    iptgTimeLabel: "IPTG addition time (h)",
+    minGrowthFracLabel: "Min. growth fraction post-induction",
+    totalTimeLabel: "Total simulation time (h)",
+    muMaxLabel: "Max growth rate μmax",
+    muLabel: "Growth rate during production",
+    limFluxLabel: "Limonene secretion flux",
+    runFba: "Run FBA",
+    runDfba: "Run dFBA simulation",
+    runScan: "Run Etot scan",
+    runScan2d: "Run dual-enzyme scan",
+    computing: "Computing… (dFBA / scan may take tens of seconds; 2D scan may take minutes)",
+    done: "Done.",
+    errorPrefix: (msg) => `Error: ${msg}`,
+    solverStatus: (s) => `Solver status: ${s}`,
+    stoppedEarly: (reason) => `Simulation stopped early: ${reason}`,
+    enzymeFluxChart: "Heterologous enzyme reaction flux (mmol/gDW/h)",
+    concChartTitle: "Concentration Time Course",
+    fluxChartTitle: "Post-induction Flux & Growth Rate",
+    timeAxis: "Time (h)",
+    limoneneAxis: "Limonene (mM)",
+    biomassAxis: "Biomass (gDW/L)",
+    glycerolAxis: "Glycerol (mM)",
+    limoneneLegend: "Limonene (mM)",
+    biomassLegend: "Biomass (gDW/L)",
+    glycerolLegend: "Glycerol (mM)",
+    limFluxLegend: "Limonene flux",
+    growthRateLegend: "Growth rate μ",
+    scanTrajTitle: (enzyme) => `${enzyme} Etot scan: limonene accumulation`,
+    extracellularLimAxis: "Extracellular limonene (mM)",
+    scanEndpointTitle: (enzyme) => `${enzyme}: flux & endpoint concentration vs Etot`,
+    maxFluxLegend: "Max post-induction flux",
+    finalLimLegend: "Final limonene concentration",
+    scan2dFinalTitle: (x, y) => `Final limonene (mM): ${x} × ${y}`,
+    scan2dFluxTitle: (x, y) => `Max post-induction flux (mmol/gDW/h): ${x} × ${y}`,
+    scan2dSameEnzymeError: "X-axis and Y-axis enzyme cannot be the same",
+    presetTitle: "Parameter Presets (saved locally)",
+    presetNone: "— Select a saved preset —",
+    presetNamePlaceholder: "Preset name",
+    presetSave: "Save",
+    presetLoad: "Load",
+    presetDelete: "Delete",
+    presetSavedMsg: (name) => `Saved preset "${name}"`,
+    presetLoadedMsg: (name) => `Loaded preset "${name}"`,
+    presetDeletedMsg: (name) => `Deleted preset "${name}"`,
+    presetNameRequired: "Enter a preset name first",
+    presetSelectRequired: "Select a preset first",
+    shareLink: "Copy share link",
+    shareLinkCopied: "Share link copied to clipboard",
+    compareToggleLabel: "Keep previous results overlaid",
+    compareClear: "Clear overlaid results",
+    compareClearedMsg: "Overlaid results cleared",
+    exportCsv: "Export CSV",
+    exportPng: "Export image",
+    exportNoData: "No results to export yet — run it first",
+    compareRunLabel: (n) => `Run ${n}`,
+  },
+};
+
+function t(key, ...args) {
+  const entry = I18N[state.lang][key];
+  return typeof entry === "function" ? entry(...args) : entry;
+}
+
+function applyStaticI18n() {
+  document.documentElement.lang = state.lang === "zh" ? "zh-Hant" : "en";
+  document.getElementById("pageTitle").textContent = t("pageTitle");
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  document.getElementById("langToggle").querySelectorAll(".lang-toggle__btn").forEach((btn) => {
+    btn.classList.toggle("is-active", btn.dataset.lang === state.lang);
+  });
+}
+
+/* ================= 本地儲存 key ================= */
+const PRESET_STORAGE_KEY = "limoneneCobra.presets.v1";
+
+/* ================= state / elements ================= */
+const state = {
+  mode: "fba",
+  lang: "zh",
+  defaults: null,
+  compare: false,
+  dfbaHistory: [],       // { runNo, time_h, limonene_mM, biomass_gDW_L, glycerol_mM, growth_rate_h, limonene_flux }
+  lastResults: {},        // 各模式最近一次結果，供 CSV 匯出使用：{ fba, dfba, scan, scan2d }
+};
+
+const els = {
+  modeTabs: document.getElementById("modeTabs"),
+  modelStatus: document.getElementById("modelStatus"),
+  runBtn: document.getElementById("runBtn"),
+  runBtnLabel: document.getElementById("runBtnLabel"),
+  statusHint: document.getElementById("statusHint"),
+  scanFieldGroup: document.getElementById("scanFieldGroup"),
+  scan2dFieldGroup: document.getElementById("scan2dFieldGroup"),
+  inducedField: document.getElementById("inducedField"),
+  durationField: document.getElementById("durationField"),
+  fbaResults: document.getElementById("fbaResults"),
+  dfbaResults: document.getElementById("dfbaResults"),
+  scanResults: document.getElementById("scanResults"),
+  scan2dResults: document.getElementById("scan2dResults"),
+  compareField: document.getElementById("compareField"),
+  compareToggle: document.getElementById("compareToggle"),
+  compareClearRow: document.getElementById("compareClearRow"),
+  presetSelect: document.getElementById("presetSelect"),
+  presetName: document.getElementById("presetName"),
+};
+
+function modeConfig() {
+  return {
+    fba: { label: t("runFba"), resultBlock: "fbaResults" },
+    dfba: { label: t("runDfba"), resultBlock: "dfbaResults" },
+    scan: { label: t("runScan"), resultBlock: "scanResults" },
+    scan2d: { label: t("runScan2d"), resultBlock: "scan2dResults" },
+  };
+}
+
+const PLOTLY_LAYOUT_BASE = {
+  paper_bgcolor: "transparent",
+  plot_bgcolor: "transparent",
+  font: { family: "JetBrains Mono, monospace", color: "#93a69d", size: 11 },
+  margin: { l: 55, r: 20, t: 40, b: 45 },
+  legend: { orientation: "h", y: -0.2 },
+  xaxis: { gridcolor: "#24382f", zerolinecolor: "#2c443c" },
+  yaxis: { gridcolor: "#24382f", zerolinecolor: "#2c443c" },
+};
+
+const ACCENT_COLORS = ["#e8a33d", "#8fbf6b", "#6bb3bf", "#d9756a", "#c79ee8"];
+
+init();
+
+async function init() {
+  applyStaticI18n();
+  bindLangToggle();
+  bindModeTabs();
+  bindPresetControls();
+  bindCompareControls();
+  bindExportControls();
+  els.runBtn.addEventListener("click", runCurrentMode);
+  updateModeUI();
+  refreshPresetSelect();
+  try {
+    const res = await fetch(`${API_BASE}/api/defaults`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    state.defaults = await res.json();
+    populateDefaults(state.defaults);
+    applyUrlParams();
+    setStatus("ok", t("ready"));
+  } catch (err) {
+    setStatus("err", t("connectError", err.message));
+  }
+}
+
+function bindLangToggle() {
+  document.getElementById("langToggle").querySelectorAll(".lang-toggle__btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.lang === state.lang) return;
+      state.lang = btn.dataset.lang;
+      applyStaticI18n();
+      updateModeUI();
+      // 若目前狀態列顯示的是就緒/檢查中，重新以新語言渲染；錯誤訊息維持原文避免誤導。
+      if (els.modelStatus.querySelector(".dot--ok")) setStatus("ok", t("ready"));
+      else if (els.modelStatus.querySelector(".dot--pending")) setStatus("pending", t("checking"));
+    });
+  });
+}
+
+function setStatus(kind, text) {
+  const dotClass = kind === "ok" ? "dot--ok" : kind === "err" ? "dot--err" : "dot--pending";
+  els.modelStatus.innerHTML = `<span class="dot ${dotClass}"></span> ${text}`;
+}
+
+function populateDefaults(d) {
+  for (const enzyme of ["DXS", "IDI", "GPPS", "LS"]) {
+    document.getElementById(`etot-${enzyme}`).value = d.Etot[enzyme];
+  }
+  document.getElementById("iptgTime").value = d.iptg_start_time_h;
+  document.getElementById("minGrowthFrac").value = d.min_growth_frac;
+  document.getElementById("totalTime").value = (d.time_step_h * d.n_steps).toFixed(2);
+  document.getElementById("scanValues").value = d.scan_values["LS"].join(", ");
+
+  document.getElementById("scanEnzyme").addEventListener("change", (e) => {
+    document.getElementById("scanValues").value = d.scan_values[e.target.value].join(", ");
+  });
+
+  document.getElementById("scanValuesX").value = d.scan_values["LS"].join(", ");
+  document.getElementById("scanValuesY").value = d.scan_values["DXS"].join(", ");
+
+  document.getElementById("scanEnzymeX").addEventListener("change", (e) => {
+    document.getElementById("scanValuesX").value = d.scan_values[e.target.value].join(", ");
+  });
+  document.getElementById("scanEnzymeY").addEventListener("change", (e) => {
+    document.getElementById("scanValuesY").value = d.scan_values[e.target.value].join(", ");
+  });
+}
+
+function bindModeTabs() {
+  els.modeTabs.querySelectorAll(".mode-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      els.modeTabs.querySelectorAll(".mode-tab").forEach((b) => b.classList.remove("is-active"));
+      btn.classList.add("is-active");
+      state.mode = btn.dataset.mode;
+      updateModeUI();
+    });
+  });
+}
+
+function updateModeUI() {
+  const cfg = modeConfig()[state.mode];
+  els.runBtnLabel.textContent = cfg.label;
+
+  els.scanFieldGroup.hidden = state.mode !== "scan";
+  els.scan2dFieldGroup.hidden = state.mode !== "scan2d";
+  els.inducedField.hidden = state.mode !== "fba";
+  els.durationField.hidden = state.mode === "fba";
+  els.compareField.hidden = state.mode !== "dfba";
+  els.compareClearRow.hidden = state.mode !== "dfba" || state.dfbaHistory.length === 0;
+
+  for (const key of ["fbaResults", "dfbaResults", "scanResults", "scan2dResults"]) {
+    document.getElementById(key).hidden = key !== cfg.resultBlock;
+  }
+  els.statusHint.textContent = "";
+  els.statusHint.className = "hint";
+}
+
+function readEtot() {
+  return {
+    DXS: Number(document.getElementById("etot-DXS").value),
+    IDI: Number(document.getElementById("etot-IDI").value),
+    GPPS: Number(document.getElementById("etot-GPPS").value),
+    LS: Number(document.getElementById("etot-LS").value),
+  };
+}
+
+function readCommonParams() {
+  const totalTime = Number(document.getElementById("totalTime").value);
+  const timeStep = state.defaults ? state.defaults.time_step_h : 0.25;
+  return {
+    Etot: readEtot(),
+    iptg_start_time_h: Number(document.getElementById("iptgTime").value),
+    min_growth_frac: Number(document.getElementById("minGrowthFrac").value),
+    n_steps: Math.max(1, Math.round(totalTime / timeStep)),
+  };
+}
+
+async function runCurrentMode() {
+  els.runBtn.disabled = true;
+  els.statusHint.className = "hint";
+  els.statusHint.textContent = t("computing");
+  try {
+    if (state.mode === "fba") await runFba();
+    else if (state.mode === "dfba") await runDfba();
+    else if (state.mode === "scan") await runScan();
+    else await runScan2d();
+    els.statusHint.textContent = t("done");
+  } catch (err) {
+    els.statusHint.className = "hint hint--error";
+    els.statusHint.textContent = t("errorPrefix", err.message);
+  } finally {
+    els.runBtn.disabled = false;
+  }
+}
+
+async function postJson(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+/* ---------------- FBA ---------------- */
+async function runFba() {
+  const induced = document.getElementById("induced").value === "true";
+  const params = readCommonParams();
+  const data = await postJson("/api/fba", { params, induced });
+  state.lastResults.fba = data;
+
+  if (data.status !== "optimal") {
+    els.statusHint.className = "hint hint--error";
+    els.statusHint.textContent = data.message || t("solverStatus", data.status);
+  }
+
+  document.getElementById("mMuMax").textContent = fmt(data.mu_max, 4) + " h⁻¹";
+  document.getElementById("mMu").textContent = fmt(data.growth_rate, 4) + " h⁻¹";
+  document.getElementById("mLimFlux").textContent = fmt(data.limonene_flux, 5) + " mmol/gDW/h";
+
+  const enzymes = Object.keys(data.enzyme_fluxes || {});
+  const values = enzymes.map((k) => data.enzyme_fluxes[k] ?? 0);
+  Plotly.newPlot("fbaEnzymeChart", [{
+    type: "bar",
+    x: enzymes,
+    y: values,
+    marker: { color: ACCENT_COLORS[0] },
+  }], {
+    ...PLOTLY_LAYOUT_BASE,
+    title: { text: t("enzymeFluxChart"), font: { size: 13, color: "#edf3ee" } },
+  }, { displayModeBar: false, responsive: true });
+}
+
+/* ---------------- dFBA ---------------- */
+async function runDfba() {
+  const params = readCommonParams();
+  const data = await postJson("/api/dfba", { params });
+  state.lastResults.dfba = data;
+
+  if (!els.compareToggle.checked) state.dfbaHistory = [];
+  state.dfbaHistory.push({ runNo: state.dfbaHistory.length + 1, ...data });
+  els.compareClearRow.hidden = state.dfbaHistory.length === 0;
+
+  if (state.dfbaHistory.length <= 1) {
+    // 單次執行：原本三軸完整曲線。
+    Plotly.newPlot("dfbaConcChart", [
+      { x: data.time_h, y: data.limonene_mM, name: t("limoneneLegend"), line: { color: ACCENT_COLORS[0], width: 2.5 } },
+      { x: data.time_h, y: data.biomass_gDW_L, name: t("biomassLegend"), yaxis: "y2", line: { color: ACCENT_COLORS[1], width: 2 } },
+      { x: data.time_h, y: data.glycerol_mM, name: t("glycerolLegend"), yaxis: "y3", line: { color: ACCENT_COLORS[2], width: 1.5, dash: "dot" } },
+    ], {
+      ...PLOTLY_LAYOUT_BASE,
+      title: { text: t("concChartTitle"), font: { size: 13, color: "#edf3ee" } },
+      xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: t("timeAxis") },
+      yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: t("limoneneAxis") },
+      yaxis2: { overlaying: "y", side: "right", showgrid: false, title: t("biomassAxis") },
+      yaxis3: { overlaying: "y", side: "right", position: 1, showgrid: false, visible: false },
+    }, { displayModeBar: false, responsive: true });
+
+    Plotly.newPlot("dfbaFluxChart", [
+      { x: data.time_h, y: data.limonene_flux, name: t("limFluxLegend"), line: { color: ACCENT_COLORS[0], width: 2 } },
+      { x: data.time_h, y: data.growth_rate_h, name: t("growthRateLegend"), yaxis: "y2", line: { color: ACCENT_COLORS[1], width: 2 } },
+    ], {
+      ...PLOTLY_LAYOUT_BASE,
+      title: { text: t("fluxChartTitle"), font: { size: 13, color: "#edf3ee" } },
+      xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: t("timeAxis") },
+      yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: "mmol/gDW/h" },
+      yaxis2: { overlaying: "y", side: "right", showgrid: false, title: "h⁻¹" },
+    }, { displayModeBar: false, responsive: true });
+  } else {
+    // 疊圖比較模式：多次執行僅疊加限烯烴濃度／通量曲線，避免多組雙 Y 軸互相干擾。
+    const concTraces = state.dfbaHistory.map((run, i) => ({
+      x: run.time_h, y: run.limonene_mM,
+      name: `${t("compareRunLabel", run.runNo)} · ${t("limoneneLegend")}`,
+      line: { color: ACCENT_COLORS[i % ACCENT_COLORS.length], width: 2 },
+    }));
+    Plotly.newPlot("dfbaConcChart", concTraces, {
+      ...PLOTLY_LAYOUT_BASE,
+      title: { text: t("concChartTitle"), font: { size: 13, color: "#edf3ee" } },
+      xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: t("timeAxis") },
+      yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: t("limoneneAxis") },
+    }, { displayModeBar: false, responsive: true });
+
+    const fluxTraces = state.dfbaHistory.map((run, i) => ({
+      x: run.time_h, y: run.limonene_flux,
+      name: `${t("compareRunLabel", run.runNo)} · ${t("limFluxLegend")}`,
+      line: { color: ACCENT_COLORS[i % ACCENT_COLORS.length], width: 2 },
+    }));
+    Plotly.newPlot("dfbaFluxChart", fluxTraces, {
+      ...PLOTLY_LAYOUT_BASE,
+      title: { text: t("fluxChartTitle"), font: { size: 13, color: "#edf3ee" } },
+      xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: t("timeAxis") },
+      yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: "mmol/gDW/h" },
+    }, { displayModeBar: false, responsive: true });
+  }
+
+  if (data.stopped_reason) {
+    els.statusHint.className = "hint hint--error";
+    els.statusHint.textContent = t("stoppedEarly", data.stopped_reason);
+  }
+}
+
+/* ---------------- Etot scan ---------------- */
+async function runScan() {
+  const enzyme = document.getElementById("scanEnzyme").value;
+  const scanValues = document.getElementById("scanValues").value
+    .split(",").map((s) => Number(s.trim())).filter((n) => !Number.isNaN(n));
+  const params = readCommonParams();
+  const data = await postJson("/api/etot-scan", { enzyme, scan_values: scanValues, params });
+  state.lastResults.scan = { enzyme, results: data.results };
+
+  const trajTraces = data.results.map((r, i) => ({
+    x: r.trace.time_h,
+    y: r.trace.limonene_mM,
+    name: `Etot = ${r.etot_uM} µM`,
+    line: { color: ACCENT_COLORS[i % ACCENT_COLORS.length], width: 2 },
+  }));
+  Plotly.newPlot("scanTrajChart", trajTraces, {
+    ...PLOTLY_LAYOUT_BASE,
+    title: { text: t("scanTrajTitle", enzyme), font: { size: 13, color: "#edf3ee" } },
+    xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: t("timeAxis") },
+    yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: t("extracellularLimAxis") },
+  }, { displayModeBar: false, responsive: true });
+
+  const etotVals = data.results.map((r) => r.etot_uM);
+  const finalLim = data.results.map((r) => r.final_limonene_mM);
+  const maxFlux = data.results.map((r) => r.max_post_iptg_flux);
+  Plotly.newPlot("scanEndpointChart", [
+    { x: etotVals, y: maxFlux, name: t("maxFluxLegend"), type: "scatter", mode: "lines+markers",
+      line: { color: ACCENT_COLORS[0] } },
+    { x: etotVals, y: finalLim, name: t("finalLimLegend"), yaxis: "y2", type: "scatter", mode: "lines+markers",
+      line: { color: ACCENT_COLORS[1], dash: "dash" } },
+  ], {
+    ...PLOTLY_LAYOUT_BASE,
+    title: { text: t("scanEndpointTitle", enzyme), font: { size: 13, color: "#edf3ee" } },
+    xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: `${enzyme} Etot (µM)`, type: "log" },
+    yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: "mmol/gDW/h" },
+    yaxis2: { overlaying: "y", side: "right", showgrid: false, title: "mM" },
+  }, { displayModeBar: false, responsive: true });
+}
+
+/* ---------------- 雙酵素 Etot 2D 掃描 ---------------- */
+async function runScan2d() {
+  const enzymeX = document.getElementById("scanEnzymeX").value;
+  const enzymeY = document.getElementById("scanEnzymeY").value;
+  if (enzymeX === enzymeY) throw new Error(t("scan2dSameEnzymeError"));
+
+  const valuesX = document.getElementById("scanValuesX").value
+    .split(",").map((s) => Number(s.trim())).filter((n) => !Number.isNaN(n));
+  const valuesY = document.getElementById("scanValuesY").value
+    .split(",").map((s) => Number(s.trim())).filter((n) => !Number.isNaN(n));
+  const params = readCommonParams();
+  const data = await postJson("/api/etot-scan-2d", {
+    enzyme_x: enzymeX, enzyme_y: enzymeY,
+    values_x: valuesX, values_y: valuesY, params,
+  });
+  state.lastResults.scan2d = data;
+
+  const xLabels = data.values_x.map((v) => `${v}`);
+  const yLabels = data.values_y.map((v) => `${v}`);
+
+  Plotly.newPlot("scan2dFinalHeatmap", [{
+    type: "heatmap",
+    x: xLabels,
+    y: yLabels,
+    z: data.final_limonene_mM,
+    colorscale: [[0, "#192e28"], [1, "#e8a33d"]],
+    colorbar: { title: "mM", titleside: "right" },
+  }], {
+    ...PLOTLY_LAYOUT_BASE,
+    title: { text: t("scan2dFinalTitle", enzymeX, enzymeY), font: { size: 13, color: "#edf3ee" } },
+    xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: `${enzymeX} Etot (µM)` },
+    yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: `${enzymeY} Etot (µM)` },
+  }, { displayModeBar: false, responsive: true });
+
+  Plotly.newPlot("scan2dFluxHeatmap", [{
+    type: "heatmap",
+    x: xLabels,
+    y: yLabels,
+    z: data.max_post_iptg_flux,
+    colorscale: [[0, "#192e28"], [1, "#8fbf6b"]],
+    colorbar: { title: "mmol/gDW/h", titleside: "right" },
+  }], {
+    ...PLOTLY_LAYOUT_BASE,
+    title: { text: t("scan2dFluxTitle", enzymeX, enzymeY), font: { size: 13, color: "#edf3ee" } },
+    xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: `${enzymeX} Etot (µM)` },
+    yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: `${enzymeY} Etot (µM)` },
+  }, { displayModeBar: false, responsive: true });
+}
+
+/* ================= 參數預設集（localStorage） ================= */
+function getPresetsStore() {
+  try {
+    return JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY) || "{}");
+  } catch (err) {
+    return {};
+  }
+}
+
+function savePresetsStore(store) {
+  localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(store));
+}
+
+function refreshPresetSelect() {
+  const store = getPresetsStore();
+  const names = Object.keys(store).sort();
+  els.presetSelect.innerHTML = `<option value="">${t("presetNone")}</option>` +
+    names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+
+function getCurrentParamSnapshot() {
+  return {
+    mode: state.mode,
+    etot: readEtot(),
+    iptgTime: document.getElementById("iptgTime").value,
+    minGrowthFrac: document.getElementById("minGrowthFrac").value,
+    totalTime: document.getElementById("totalTime").value,
+    induced: document.getElementById("induced").value,
+    scanEnzyme: document.getElementById("scanEnzyme").value,
+    scanValues: document.getElementById("scanValues").value,
+    scanEnzymeX: document.getElementById("scanEnzymeX").value,
+    scanValuesX: document.getElementById("scanValuesX").value,
+    scanEnzymeY: document.getElementById("scanEnzymeY").value,
+    scanValuesY: document.getElementById("scanValuesY").value,
+  };
+}
+
+function applyParamSnapshot(snap) {
+  if (!snap) return;
+  if (snap.etot) {
+    for (const enzyme of ["DXS", "IDI", "GPPS", "LS"]) {
+      if (snap.etot[enzyme] !== undefined) document.getElementById(`etot-${enzyme}`).value = snap.etot[enzyme];
+    }
+  }
+  const setIf = (id, v) => { if (v !== undefined && v !== null && v !== "") document.getElementById(id).value = v; };
+  setIf("iptgTime", snap.iptgTime);
+  setIf("minGrowthFrac", snap.minGrowthFrac);
+  setIf("totalTime", snap.totalTime);
+  setIf("induced", snap.induced);
+  setIf("scanEnzyme", snap.scanEnzyme);
+  setIf("scanValues", snap.scanValues);
+  setIf("scanEnzymeX", snap.scanEnzymeX);
+  setIf("scanValuesX", snap.scanValuesX);
+  setIf("scanEnzymeY", snap.scanEnzymeY);
+  setIf("scanValuesY", snap.scanValuesY);
+  if (snap.mode) {
+    const btn = els.modeTabs.querySelector(`.mode-tab[data-mode="${snap.mode}"]`);
+    if (btn) btn.click();
+  }
+}
+
+function bindPresetControls() {
+  document.getElementById("presetSaveBtn").addEventListener("click", () => {
+    const name = els.presetName.value.trim();
+    if (!name) { flashHint(t("presetNameRequired"), true); return; }
+    const store = getPresetsStore();
+    store[name] = getCurrentParamSnapshot();
+    savePresetsStore(store);
+    refreshPresetSelect();
+    els.presetSelect.value = name;
+    flashHint(t("presetSavedMsg", name), false);
+  });
+
+  document.getElementById("presetLoadBtn").addEventListener("click", () => {
+    const name = els.presetSelect.value;
+    if (!name) { flashHint(t("presetSelectRequired"), true); return; }
+    const store = getPresetsStore();
+    if (store[name]) {
+      applyParamSnapshot(store[name]);
+      flashHint(t("presetLoadedMsg", name), false);
+    }
+  });
+
+  document.getElementById("presetDeleteBtn").addEventListener("click", () => {
+    const name = els.presetSelect.value;
+    if (!name) { flashHint(t("presetSelectRequired"), true); return; }
+    const store = getPresetsStore();
+    delete store[name];
+    savePresetsStore(store);
+    refreshPresetSelect();
+    flashHint(t("presetDeletedMsg", name), false);
+  });
+
+  document.getElementById("shareLinkBtn").addEventListener("click", () => {
+    const url = buildShareUrl();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url)
+        .then(() => flashHint(t("shareLinkCopied"), false))
+        .catch(() => window.prompt(t("shareLinkCopied"), url));
+    } else {
+      window.prompt(t("shareLinkCopied"), url);
+    }
+  });
+}
+
+function bindCompareControls() {
+  els.compareToggle.addEventListener("change", () => {
+    state.compare = els.compareToggle.checked;
+  });
+  document.getElementById("compareClearBtn").addEventListener("click", () => {
+    state.dfbaHistory = [];
+    els.compareClearRow.hidden = true;
+    flashHint(t("compareClearedMsg"), false);
+  });
+}
+
+function flashHint(text, isError) {
+  els.statusHint.className = isError ? "hint hint--error" : "hint";
+  els.statusHint.textContent = text;
+}
+
+/* ================= 分享連結 (URL 參數) ================= */
+function buildShareUrl() {
+  const snap = getCurrentParamSnapshot();
+  const params = new URLSearchParams();
+  params.set("mode", snap.mode);
+  params.set("lang", state.lang);
+  params.set("dxs", snap.etot.DXS);
+  params.set("idi", snap.etot.IDI);
+  params.set("gpps", snap.etot.GPPS);
+  params.set("ls", snap.etot.LS);
+  params.set("iptg", snap.iptgTime);
+  params.set("mgf", snap.minGrowthFrac);
+  params.set("tt", snap.totalTime);
+  params.set("induced", snap.induced);
+  params.set("se", snap.scanEnzyme);
+  params.set("sv", snap.scanValues);
+  params.set("sex", snap.scanEnzymeX);
+  params.set("svx", snap.scanValuesX);
+  params.set("sey", snap.scanEnzymeY);
+  params.set("svy", snap.scanValuesY);
+  const url = new URL(window.location.href);
+  url.search = params.toString();
+  return url.toString();
+}
+
+function applyUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  if (![...params.keys()].length) return;
+
+  if (params.has("lang") && params.get("lang") !== state.lang) {
+    state.lang = params.get("lang") === "en" ? "en" : "zh";
+    applyStaticI18n();
+  }
+  applyParamSnapshot({
+    mode: params.get("mode") || undefined,
+    etot: {
+      DXS: params.get("dxs") || undefined,
+      IDI: params.get("idi") || undefined,
+      GPPS: params.get("gpps") || undefined,
+      LS: params.get("ls") || undefined,
+    },
+    iptgTime: params.get("iptg") || undefined,
+    minGrowthFrac: params.get("mgf") || undefined,
+    totalTime: params.get("tt") || undefined,
+    induced: params.get("induced") || undefined,
+    scanEnzyme: params.get("se") || undefined,
+    scanValues: params.get("sv") || undefined,
+    scanEnzymeX: params.get("sex") || undefined,
+    scanValuesX: params.get("svx") || undefined,
+    scanEnzymeY: params.get("sey") || undefined,
+    scanValuesY: params.get("svy") || undefined,
+  });
+}
+
+/* ================= 結果匯出 ================= */
+function bindExportControls() {
+  document.querySelectorAll("[data-export-csv]").forEach((btn) => {
+    btn.addEventListener("click", () => exportCsv(btn.dataset.exportCsv));
+  });
+  document.querySelectorAll("[data-export-png]").forEach((btn) => {
+    btn.addEventListener("click", () => exportPng(btn.dataset.exportPng));
+  });
+}
+
+function csvEscape(v) {
+  const s = v === null || v === undefined ? "" : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function rowsToCsv(headers, rows) {
+  return [headers, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
+}
+
+function downloadCsv(filename, csvContent) {
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportCsv(mode) {
+  const data = state.lastResults[mode];
+  if (!data) { flashHint(t("exportNoData"), true); return; }
+
+  let csv, filename;
+  if (mode === "fba") {
+    const rows = Object.entries(data.enzyme_fluxes || {}).map(([k, v]) => [k, v]);
+    rows.push(["mu_max_h-1", data.mu_max]);
+    rows.push(["growth_rate_h-1", data.growth_rate]);
+    rows.push(["limonene_flux_mmol_gDW_h", data.limonene_flux]);
+    csv = rowsToCsv(["metric", "value"], rows);
+    filename = "fba_result.csv";
+  } else if (mode === "dfba") {
+    const headers = ["time_h", "limonene_mM", "biomass_gDW_L", "glycerol_mM", "growth_rate_h", "limonene_flux"];
+    const rows = data.time_h.map((tv, i) => [
+      tv, data.limonene_mM[i], data.biomass_gDW_L[i], data.glycerol_mM[i],
+      data.growth_rate_h[i], data.limonene_flux[i],
+    ]);
+    csv = rowsToCsv(headers, rows);
+    filename = "dfba_result.csv";
+  } else if (mode === "scan") {
+    const headers = ["etot_uM", "final_limonene_mM", "max_post_iptg_flux"];
+    const rows = data.results.map((r) => [r.etot_uM, r.final_limonene_mM, r.max_post_iptg_flux]);
+    csv = rowsToCsv(headers, rows);
+    filename = `scan_${data.enzyme}_result.csv`;
+  } else if (mode === "scan2d") {
+    const headers = [`${data.enzyme_y}\\${data.enzyme_x}`, ...data.values_x.map(String)];
+    const finalRows = data.values_y.map((y, i) => [y, ...data.final_limonene_mM[i]]);
+    const fluxRows = data.values_y.map((y, i) => [y, ...data.max_post_iptg_flux[i]]);
+    csv = "final_limonene_mM\n" + rowsToCsv(headers, finalRows) +
+      "\n\nmax_post_iptg_flux\n" + rowsToCsv(headers, fluxRows);
+    filename = `scan2d_${data.enzyme_x}_${data.enzyme_y}_result.csv`;
+  } else {
+    return;
+  }
+  downloadCsv(filename, csv);
+}
+
+function exportPng(blockId) {
+  const block = document.getElementById(blockId);
+  const charts = Array.from(block.querySelectorAll(".chart")).filter((el) => el.data);
+  if (!charts.length) { flashHint(t("exportNoData"), true); return; }
+  charts.forEach((chartDiv, i) => {
+    setTimeout(() => {
+      Plotly.downloadImage(chartDiv, { format: "png", filename: chartDiv.id, width: 1000, height: 600 });
+    }, i * 400);
+  });
+}
+
+function fmt(v, digits) {
+  if (v === null || v === undefined || Number.isNaN(v)) return "—";
+  return Number(v).toFixed(digits);
+}
+
+</script>
+</body>
+</html>
