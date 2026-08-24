@@ -13,8 +13,16 @@ LimoneneCOBRA FBA / dFBA 網頁後端（單檔版）。
     LIM009_params.csv                  V9 參數登錄表
     index.html                         前端網頁
     models/iEC1356_Bl21DE3.mat         COBRA Toolbox 菌株模型（需自行放入）
+
+加速（選用，強烈建議）：
+    pip install highspy
+    → 會自動改用 HiGHS 這個 LP solver（比 cobrapy 預設的 GLPK 快很多倍），
+      對 FBA / dFBA / 掃描 / 2D 掃描全部都有幫助，沒裝也能正常運作只是比較慢。
+    另外，Etot 掃描與雙酵素 2D 掃描的每一格彼此獨立，會自動用多個 CPU 核心平行
+    計算（背景用 ProcessPoolExecutor），不需要額外設定。
 """
 
+import concurrent.futures
 import csv
 import math
 import os
@@ -224,7 +232,22 @@ def build_model(model_path):
         if rxn_id in model.reactions:
             model.reactions.get_by_id(rxn_id).bounds = (0, 0)
 
+    _use_fast_solver(model)
     return model
+
+
+def _use_fast_solver(model):
+    """嘗試切換到比預設 GLPK 快很多的 LP solver（HiGHS）。dFBA 每個時間點都要重新
+    求解一次 LP，換一個快的 solver 對所有模式（FBA/dFBA/掃描/2D 掃描）都有幫助，
+    且不會改變求解結果，只是求解速度不同。裝不到 highspy 或 cobrapy 版本不支援時，
+    安靜地維持原本的 solver，不影響任何功能。"""
+    for solver_name in ("highs", "cplex", "gurobi"):
+        try:
+            model.solver = solver_name
+            return solver_name
+        except Exception:
+            continue
+    return None
 
 
 def apply_medium009(model, defaults):
@@ -588,50 +611,41 @@ def run_dfba(model, params):
 
 
 def etot_scan(model, base_params, enzyme, scan_values_uM):
-    """對單一酵素做 one-at-a-time Etot 掃描，其餘酵素固定在基準值。"""
-    results = []
-    with model:
-        apply_adjustable_medium(model, base_params)
-        for value in scan_values_uM:
-            params = dict(base_params)
-            params["Etot"] = dict(base_params["Etot"])
-            params["Etot"][enzyme] = value
-            with model:
-                trace = run_dfba(model, params)
-            final_limonene = trace["limonene_mM"][-1]
-            fluxes = [f for f in trace["limonene_flux"] if f is not None]
-            max_flux = max(fluxes) if fluxes else 0.0
-            results.append({
-                "etot_uM": value,
-                "trace": trace,
-                "final_limonene_mM": final_limonene,
-                "max_post_iptg_flux": max_flux,
-            })
-    return results
+    """對單一酵素做 one-at-a-time Etot 掃描，其餘酵素固定在基準值。
+    每個掃描值彼此獨立（互不影響），交給 run_params_grid 平行計算。"""
+    params_list = []
+    for value in scan_values_uM:
+        p = dict(base_params)
+        p["Etot"] = dict(base_params["Etot"])
+        p["Etot"][enzyme] = value
+        params_list.append(p)
+
+    raw_results = run_params_grid(model, base_params, params_list)
+    return [{"etot_uM": value, **r} for value, r in zip(scan_values_uM, raw_results)]
 
 
 def etot_scan_2d(model, base_params, enzyme_x, enzyme_y, values_x, values_y):
     """雙酵素交叉掃描（two-factor grid）：enzyme_x/enzyme_y 各自的 Etot 網格組合，
-    其餘酵素固定在基準值。回傳依 (y, x) 排列的網格矩陣，方便前端畫 heatmap。"""
-    final_grid = []
-    flux_grid = []
-    with model:
-        apply_adjustable_medium(model, base_params)
-        for y_value in values_y:
-            final_row = []
-            flux_row = []
-            for x_value in values_x:
-                params = dict(base_params)
-                params["Etot"] = dict(base_params["Etot"])
-                params["Etot"][enzyme_x] = x_value
-                params["Etot"][enzyme_y] = y_value
-                with model:
-                    trace = run_dfba(model, params)
-                final_row.append(trace["limonene_mM"][-1])
-                fluxes = [f for f in trace["limonene_flux"] if f is not None]
-                flux_row.append(max(fluxes) if fluxes else 0.0)
-            final_grid.append(final_row)
-            flux_grid.append(flux_row)
+    其餘酵素固定在基準值。每個網格點彼此獨立，交給 run_params_grid 平行計算，
+    再依 (y, x) reshape 回二維矩陣，方便前端畫 heatmap。"""
+    params_list = []
+    for y_value in values_y:
+        for x_value in values_x:
+            p = dict(base_params)
+            p["Etot"] = dict(base_params["Etot"])
+            p["Etot"][enzyme_x] = x_value
+            p["Etot"][enzyme_y] = y_value
+            params_list.append(p)
+
+    raw_results = run_params_grid(model, base_params, params_list)
+
+    n_x = len(values_x)
+    final_grid, flux_grid = [], []
+    for row in range(len(values_y)):
+        row_results = raw_results[row * n_x:(row + 1) * n_x]
+        final_grid.append([r["final_limonene_mM"] for r in row_results])
+        flux_grid.append([r["max_post_iptg_flux"] for r in row_results])
+
     return {
         "enzyme_x": enzyme_x,
         "enzyme_y": enzyme_y,
@@ -640,6 +654,69 @@ def etot_scan_2d(model, base_params, enzyme_x, enzyme_y, values_x, values_y):
         "final_limonene_mM": final_grid,
         "max_post_iptg_flux": flux_grid,
     }
+
+
+# ---- 平行運算基礎設施：Etot 掃描／2D 掃描的每一格都是獨立的 dFBA 模擬，---
+# ---- 用多個 process 同時算，機器有幾顆核心大致就能快幾倍。 -------------
+
+_worker_model = None  # 每個 worker process 自己的模型物件（process 之間不共用）
+_MAX_POOL_WORKERS = max(1, (os.cpu_count() or 2) - 1)
+
+
+def _init_pool_worker(model_path, medium_defaults):
+    """ProcessPoolExecutor 的 initializer：每個 worker process 啟動時只執行「一次」，
+    在這裡把模型讀進來、套用培養基設定，之後這個 worker 收到的每一個任務都重複使用
+    同一個模型物件（用 with model: 包住做暫時性修改）。這樣平行的成本只有『開頭讀一次
+    模型檔』，不會變成『每一格都重新讀一次模型檔』（那樣反而更慢，得不償失）。"""
+    global _worker_model
+    model = build_model(model_path)
+    model = apply_medium009(model, medium_defaults)
+    biomass_rxns = [r.id for r in model.reactions if r.objective_coefficient != 0]
+    model._biomass_rxn = biomass_rxns[0] if biomass_rxns else None
+    _worker_model = model
+
+
+def _pool_dfba_task(params):
+    """在 worker process 裡跑「一組」完整 dFBA 參數，回傳這組的摘要結果（含完整
+    時間序列，供前端畫軌跡圖）。"""
+    global _worker_model
+    with _worker_model:
+        apply_adjustable_medium(_worker_model, params)
+        trace = run_dfba(_worker_model, params)
+    fluxes = [f for f in trace["limonene_flux"] if f is not None]
+    return {
+        "trace": trace,
+        "final_limonene_mM": trace["limonene_mM"][-1],
+        "max_post_iptg_flux": max(fluxes) if fluxes else 0.0,
+    }
+
+
+def run_params_grid(model, base_params, params_list):
+    """平行執行多組獨立的 dFBA 參數。
+    只有 1 組、或機器偵測不到多核心時，直接在目前 process 裡照原本方式跑，
+    避免產生行程池的額外開銷（讀模型檔、啟動 process）反而比循序執行更慢。"""
+    if len(params_list) <= 1 or _MAX_POOL_WORKERS <= 1:
+        results = []
+        with model:
+            apply_adjustable_medium(model, base_params)
+            for params in params_list:
+                with model:
+                    trace = run_dfba(model, params)
+                fluxes = [f for f in trace["limonene_flux"] if f is not None]
+                results.append({
+                    "trace": trace,
+                    "final_limonene_mM": trace["limonene_mM"][-1],
+                    "max_post_iptg_flux": max(fluxes) if fluxes else 0.0,
+                })
+        return results
+
+    n_workers = min(_MAX_POOL_WORKERS, len(params_list))
+    medium_defaults = get_registry().to_dfba_defaults()
+    with concurrent.futures.ProcessPoolExecutor(
+            max_workers=n_workers,
+            initializer=_init_pool_worker,
+            initargs=(MODEL_PATH, medium_defaults)) as executor:
+        return list(executor.map(_pool_dfba_task, params_list))
 
 
 # ============================================================
