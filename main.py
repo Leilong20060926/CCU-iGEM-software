@@ -48,6 +48,17 @@ class ParamRegistry:
     def scalar(self, code):
         return float(self._rows[code]["v9_value"])
 
+    def scalar_or_default(self, code, default):
+        """同 scalar()，但若 CSV 沒有這個 parameter_code 就回傳預設值，不拋例外。
+        用於尚未登錄進 LIM009_params.csv 的可調參數（如 ATPM / DXPS / METAT / FPPS 邊界）。"""
+        row = self._rows.get(code)
+        if row is None:
+            return default
+        try:
+            return float(row["v9_value"])
+        except (KeyError, ValueError, TypeError):
+            return default
+
     def string(self, code):
         return self._rows[code]["v9_value"]
 
@@ -101,6 +112,12 @@ class ParamRegistry:
             "maxUptake.EX_glyc_e": r.scalar("maxUptake.EX_glyc_e"),
             "maxUptake.EX_o2_e": r.scalar("maxUptake.EX_o2_e"),
             "sim.richAminoAcidMaxUptake": r.scalar("sim.richAminoAcidMaxUptake"),
+            # 以下為可由前端調整的原生代謝路徑邊界，若 LIM009_params.csv 尚未登錄
+            # 對應 parameter_code，就退回預設值（不會拋例外）。
+            "atpm_lb": r.scalar_or_default("sim.atpmLB", 4.0),
+            "dxps_ub": r.scalar_or_default("bounds.DXPS_ub", 30.0),
+            "metat_ub": r.scalar_or_default("bounds.METAT_ub", 0.10),
+            "fpps_ub": r.scalar_or_default("bounds.FPPS_ub", 0.0),
         }
 
 
@@ -141,6 +158,12 @@ AA_EXCHANGES = [
     "EX_met__L_e", "EX_phe__L_e", "EX_pro__L_e", "EX_ser__L_e",
     "EX_thr__L_e", "EX_trp__L_e", "EX_tyr__L_e", "EX_val__L_e",
 ]
+
+MEDIUM_NAME = "BioShop Terrific Broth (Tryptone 12g/L, Yeast Extract 24g/L)"
+
+# 原生代謝路徑邊界可調的反應 ID：MEP 路徑（DXPS）、甲硫胺酸代謝（METAT）、
+# 法尼基焦磷酸合成酶（FPPS，作為 knock-down 目標）。若模型中沒有這些 ID 會被安全略過。
+NATIVE_PATHWAY_BOUNDS = ("DXPS", "METAT", "FPPS")
 
 
 def _ensure_metabolite(model, met_id, name, formula, charge, compartment):
@@ -205,19 +228,29 @@ def build_model(model_path):
 
 
 def apply_medium009(model, defaults):
-    """比照 prepareModel009() 的 TB 類培養基設定。"""
+    """比照 prepareModel009() 的 TB 類培養基設定（BioShop Terrific Broth Formulation）。"""
     for rxn in model.exchanges:
         if rxn.lower_bound < 0:
             rxn.lower_bound = 0
 
+    # 明確封鎖葡萄糖攝取（主要碳源改用甘油）。
+    if "EX_glc__D_e" in model.reactions:
+        model.reactions.EX_glc__D_e.lower_bound = 0
+
+    # 限制甘油攝取（主要碳源），數值來自 LIM009_params.csv 的 maxUptake.EX_glyc_e。
     model.reactions.EX_glyc_e.lower_bound = -abs(defaults["maxUptake.EX_glyc_e"])
+    model.reactions.EX_glyc_e.upper_bound = 1000
+
     for rxn_id in RICH_MEDIUM_OPEN:
         if rxn_id in model.reactions:
             model.reactions.get_by_id(rxn_id).lower_bound = -1000
     for rxn_id in TRACE_ION_RXNS:
         if rxn_id in model.reactions:
             model.reactions.get_by_id(rxn_id).lower_bound = -1000
+
+    # 好氧呼吸上限，數值來自 LIM009_params.csv 的 maxUptake.EX_o2_e。
     model.reactions.EX_o2_e.lower_bound = -abs(defaults["maxUptake.EX_o2_e"])
+    model.reactions.EX_o2_e.upper_bound = 1000
 
     rich_aa_uptake = defaults["sim.richAminoAcidMaxUptake"]
     for rxn_id in AA_EXCHANGES:
@@ -225,6 +258,82 @@ def apply_medium009(model, defaults):
             model.reactions.get_by_id(rxn_id).lower_bound = -abs(rich_aa_uptake)
 
     return model
+
+
+def apply_adjustable_medium(model, params):
+    """套用可由前端調整的培養基攝取限制與原生路徑邊界（每次請求時套用在傳入的
+    working model / cobra context 上，不會影響共用的 base model 快取）。
+    對應可調參數：甘油/氧氣攝取上限、豐富培養基胺基酸攝取上限、ATPM 維持能量下限、
+    以及 DXPS / METAT / FPPS 三個原生反應的上限（後三者若模型中不存在會安全略過）。"""
+    if "EX_glyc_e" in model.reactions:
+        model.reactions.EX_glyc_e.lower_bound = -abs(params["maxUptake.EX_glyc_e"])
+        model.reactions.EX_glyc_e.upper_bound = 1000
+    if "EX_o2_e" in model.reactions:
+        model.reactions.EX_o2_e.lower_bound = -abs(params["maxUptake.EX_o2_e"])
+        model.reactions.EX_o2_e.upper_bound = 1000
+
+    rich_aa_uptake = params["sim.richAminoAcidMaxUptake"]
+    for rxn_id in AA_EXCHANGES:
+        if rxn_id in model.reactions:
+            model.reactions.get_by_id(rxn_id).lower_bound = -abs(rich_aa_uptake)
+
+    if "ATPM" in model.reactions:
+        model.reactions.ATPM.lower_bound = params["atpm_lb"]
+    if "DXPS" in model.reactions:
+        model.reactions.DXPS.upper_bound = params["dxps_ub"]
+    if "METAT" in model.reactions:
+        model.reactions.METAT.upper_bound = params["metat_ub"]
+    if "FPPS" in model.reactions:
+        model.reactions.FPPS.upper_bound = params["fpps_ub"]
+
+    return model
+
+
+def metabolite_gross_production_rate(model, solution, met_id):
+    """計算某代謝物在目前解下的『總生產速率』：加總所有對該代謝物淨貢獻為正
+    （即生產方向）的反應通量 × 化學計量係數。用於 ATP / NADPH 的 cofactor balance 分析。
+    若模型中沒有該代謝物 ID，回傳 None。"""
+    if met_id not in model.metabolites:
+        return None
+    met = model.metabolites.get_by_id(met_id)
+    total = 0.0
+    for rxn in met.reactions:
+        coeff = rxn.metabolites[met]
+        flux = solution.fluxes.get(rxn.id, 0.0)
+        contribution = coeff * flux
+        if contribution > 0:
+            total += contribution
+    return total
+
+
+def build_medium_pathway_report(model, capacities):
+    """組出培養基與路徑邊界報告用的資料（供前端渲染成文字報表）。
+    找不到的反應回傳 None，前端會顯示為 N/A，不會因模型缺少該反應而出錯。"""
+    def bounds_of(rxn_id):
+        if rxn_id in model.reactions:
+            r = model.reactions.get_by_id(rxn_id)
+            return [r.lower_bound, r.upper_bound]
+        return None
+
+    def ub_of(rxn_id):
+        b = bounds_of(rxn_id)
+        return b[1] if b else None
+
+    def lb_of(rxn_id):
+        b = bounds_of(rxn_id)
+        return b[0] if b else None
+
+    return {
+        "medium_name": MEDIUM_NAME,
+        "glycerol_bounds": bounds_of("EX_glyc_e"),
+        "oxygen_bounds": bounds_of("EX_o2_e"),
+        "atpm_lb": lb_of("ATPM"),
+        "dxps_ub": ub_of("DXPS"),
+        "metat_ub": ub_of("METAT"),
+        "fpps_ub": ub_of("FPPS"),
+        "gpps_ub": capacities.get("GPPS"),
+        "lims_ub": capacities.get("LS"),
+    }
 
 
 # ============================================================
@@ -481,21 +590,23 @@ def run_dfba(model, params):
 def etot_scan(model, base_params, enzyme, scan_values_uM):
     """對單一酵素做 one-at-a-time Etot 掃描，其餘酵素固定在基準值。"""
     results = []
-    for value in scan_values_uM:
-        params = dict(base_params)
-        params["Etot"] = dict(base_params["Etot"])
-        params["Etot"][enzyme] = value
-        with model:
-            trace = run_dfba(model, params)
-        final_limonene = trace["limonene_mM"][-1]
-        fluxes = [f for f in trace["limonene_flux"] if f is not None]
-        max_flux = max(fluxes) if fluxes else 0.0
-        results.append({
-            "etot_uM": value,
-            "trace": trace,
-            "final_limonene_mM": final_limonene,
-            "max_post_iptg_flux": max_flux,
-        })
+    with model:
+        apply_adjustable_medium(model, base_params)
+        for value in scan_values_uM:
+            params = dict(base_params)
+            params["Etot"] = dict(base_params["Etot"])
+            params["Etot"][enzyme] = value
+            with model:
+                trace = run_dfba(model, params)
+            final_limonene = trace["limonene_mM"][-1]
+            fluxes = [f for f in trace["limonene_flux"] if f is not None]
+            max_flux = max(fluxes) if fluxes else 0.0
+            results.append({
+                "etot_uM": value,
+                "trace": trace,
+                "final_limonene_mM": final_limonene,
+                "max_post_iptg_flux": max_flux,
+            })
     return results
 
 
@@ -504,21 +615,23 @@ def etot_scan_2d(model, base_params, enzyme_x, enzyme_y, values_x, values_y):
     其餘酵素固定在基準值。回傳依 (y, x) 排列的網格矩陣，方便前端畫 heatmap。"""
     final_grid = []
     flux_grid = []
-    for y_value in values_y:
-        final_row = []
-        flux_row = []
-        for x_value in values_x:
-            params = dict(base_params)
-            params["Etot"] = dict(base_params["Etot"])
-            params["Etot"][enzyme_x] = x_value
-            params["Etot"][enzyme_y] = y_value
-            with model:
-                trace = run_dfba(model, params)
-            final_row.append(trace["limonene_mM"][-1])
-            fluxes = [f for f in trace["limonene_flux"] if f is not None]
-            flux_row.append(max(fluxes) if fluxes else 0.0)
-        final_grid.append(final_row)
-        flux_grid.append(flux_row)
+    with model:
+        apply_adjustable_medium(model, base_params)
+        for y_value in values_y:
+            final_row = []
+            flux_row = []
+            for x_value in values_x:
+                params = dict(base_params)
+                params["Etot"] = dict(base_params["Etot"])
+                params["Etot"][enzyme_x] = x_value
+                params["Etot"][enzyme_y] = y_value
+                with model:
+                    trace = run_dfba(model, params)
+                final_row.append(trace["limonene_mM"][-1])
+                fluxes = [f for f in trace["limonene_flux"] if f is not None]
+                flux_row.append(max(fluxes) if fluxes else 0.0)
+            final_grid.append(final_row)
+            flux_grid.append(flux_row)
     return {
         "enzyme_x": enzyme_x,
         "enzyme_y": enzyme_y,
@@ -627,6 +740,7 @@ def fba():
     induced = bool(body.get("induced", True))
 
     model = working_model()
+    apply_adjustable_medium(model, params)
     capacities = {
         enzyme: params["kcat"][enzyme] * params["Etot"][enzyme] * 3.6
                 * params["cell_volume_L_per_gDW"]
@@ -651,6 +765,12 @@ def fba():
     model.objective = "EX_limonene_e"
     prod_sol = model.optimize()
 
+    atp_rate = None
+    nadph_rate = None
+    if prod_sol.status == "optimal":
+        atp_rate = metabolite_gross_production_rate(model, prod_sol, "atp_c")
+        nadph_rate = metabolite_gross_production_rate(model, prod_sol, "nadph_c")
+
     return jsonify({
         "status": prod_sol.status,
         "induced": induced,
@@ -663,6 +783,11 @@ def fba():
             for name, rxn_id in T7_ENZYME_RXNS.items()
         } if prod_sol.status == "optimal" else {},
         "capacities_mmol_gDW_h": capacities,
+        "cofactors": {
+            "atp_production_mmol_gDW_h": atp_rate,
+            "nadph_production_mmol_gDW_h": nadph_rate,
+        },
+        "medium_pathway_report": build_medium_pathway_report(model, capacities),
     })
 
 
@@ -672,6 +797,7 @@ def dfba():
     body = request.get_json(force=True, silent=True) or {}
     params = merge_params(body.get("params"))
     model = working_model()
+    apply_adjustable_medium(model, params)
     result = run_dfba(model, params)
     return jsonify(result)
 

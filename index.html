@@ -9,19 +9,43 @@
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 <style>
 :root {
-  --bg-deep: #12211d;
-  --bg-panel: #192e28;
-  --bg-panel-raised: #203830;
-  --border: #2c443c;
-  --border-soft: #24382f;
-  --text: #edf3ee;
-  --text-muted: #93a69d;
-  --accent: #e8a33d;      /* 限烯烴油色：琥珀金 */
-  --accent-soft: #e8a33d33;
-  --leaf: #8fbf6b;        /* 果皮綠，作為輔助色 */
-  --danger: #d9756a;
+  --bg-deep: #17110c;
+  --bg-panel: #1f1811;
+  --bg-panel-raised: #271e15;
+  --border: #3a2d1f;
+  --border-soft: #2c2216;
+  --text: #f2ead9;
+  --text-muted: #a8977c;
+  --accent: #d5a746;      /* NoFold logo 金黃：主強調色（文字/邊框用，日間會加深以維持對比） */
+  --accent-soft: #d5a74633;
+  --accent-bright: #d5a746;   /* logo 原始亮金黃，不隨主題加深：用於實色按鈕底、圖表 */
+  --accent2: #e0bc60;     /* NoFold logo 亮金黃（葉片高光），圖表第 5 色（文字/邊框用） */
+  --accent2-bright: #e0bc60;  /* 同上，不隨主題加深 */
+  --leaf: #a39d56;        /* NoFold logo 橄欖綠 */
+  --steel: #98bfd5;       /* NoFold logo 淺藍 */
+  --danger: #c98643;      /* NoFold logo 穗粒橘褐（右上角小圓點） */
+  --bg-glow-1: #241b12;
+  --bg-glow-2: #1c140d;
   --font-display: "Space Grotesk", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+html[data-theme="light"] {
+  --bg-deep: #ece2cd;
+  --bg-panel: #fbf7ee;
+  --bg-panel-raised: #ffffff;
+  --border: #ddceac;
+  --border-soft: #e6d9b8;
+  --text: #2b2013;
+  --text-muted: #7a6b4f;
+  --accent: #997832;      /* logo 金黃加深，確保在淺色底上對比足夠 */
+  --accent-soft: #99783226;
+  --accent2: #a18745;     /* logo 亮金黃加深 */
+  --leaf: #75713d;        /* logo 橄欖綠加深 */
+  --steel: #5e7684;       /* logo 淺藍加深 */
+  --danger: #966432;      /* logo 穗粒橘褐加深 */
+  --bg-glow-1: #f3ead2;
+  --bg-glow-2: #ece0c4;
 }
 
 * { box-sizing: border-box; }
@@ -31,10 +55,11 @@ html, body {
   min-height: 100vh;
   background: var(--bg-deep);
   background-image:
-    radial-gradient(circle at 15% 0%, #1b3830 0%, transparent 45%),
-    radial-gradient(circle at 100% 100%, #17281f 0%, transparent 55%);
+    radial-gradient(circle at 15% 0%, var(--bg-glow-1) 0%, transparent 45%),
+    radial-gradient(circle at 100% 100%, var(--bg-glow-2) 0%, transparent 55%);
   color: var(--text);
   font-family: var(--font-display);
+  transition: background-color .2s ease, color .2s ease;
 }
 
 .console {
@@ -118,9 +143,26 @@ html, body {
 }
 
 .lang-toggle__btn.is-active {
-  background: var(--accent);
+  background: var(--accent-bright);
   color: #1b1204;
 }
+
+.theme-toggle {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-panel-raised);
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color .15s ease, color .15s ease;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ---------- Mode tabs ---------- */
 .mode-tabs {
@@ -227,7 +269,7 @@ html, body {
 
 .run-btn {
   width: 100%;
-  background: var(--accent);
+  background: var(--accent-bright);
   color: #1b1204;
   border: none;
   border-radius: 8px;
@@ -272,7 +314,23 @@ html, body {
   display: flex;
   gap: 8px;
 }
-.preset-row select { flex: 1 1 auto; }
+.preset-row select,
+.preset-row input {
+  flex: 1 1 auto;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 10px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color .15s ease;
+}
+.preset-row select:focus,
+.preset-row input:focus { border-color: var(--accent); }
+.preset-row select option { background: var(--bg-panel); color: var(--text); }
+.preset-row input::placeholder { color: var(--text-muted); }
 
 .checkbox-field {
   display: flex;
@@ -290,6 +348,59 @@ html, body {
   gap: 8px;
   margin-bottom: 12px;
 }
+
+.report-block {
+  background: var(--bg-deep, #0e1a16);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-x: auto;
+  margin-top: 4px;
+}
+
+.summary-line {
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 4px 0 16px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+@media (max-width: 720px) {
+  .chart-grid { grid-template-columns: 1fr; }
+}
+
+.report-details {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.report-details summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+.report-details summary:hover { color: var(--accent); }
+.report-details[open] summary { color: var(--accent); margin-bottom: 4px; }
 
 .hint {
   font-family: var(--font-mono);
@@ -363,6 +474,9 @@ html, body {
         <button class="lang-toggle__btn is-active" data-lang="zh">中</button>
         <button class="lang-toggle__btn" data-lang="en">EN</button>
       </div>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">
+        <span id="themeToggleIcon">&#9788;</span>
+      </button>
     </div>
   </header>
 
@@ -426,6 +540,39 @@ html, body {
           <label for="etot-LS" data-i18n="lsLabel">LS（檸檬烯合成酶）</label>
           <input type="number" id="etot-LS" step="0.01" min="0">
         </div>
+      </div>
+
+      <div class="field-group">
+        <h2 class="field-group__title" data-i18n="mediumTitle">培養基與路徑邊界（可調）</h2>
+        <div class="field">
+          <label for="glycerolUptake" data-i18n="glycerolUptakeLabel">甘油攝取上限 (mmol/gDW/h)</label>
+          <input type="number" id="glycerolUptake" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="oxygenUptake" data-i18n="oxygenUptakeLabel">氧氣攝取上限 (mmol/gDW/h)</label>
+          <input type="number" id="oxygenUptake" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="aaUptake" data-i18n="aaUptakeLabel">豐富培養基胺基酸攝取上限 (mmol/gDW/h)</label>
+          <input type="number" id="aaUptake" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="atpmLb" data-i18n="atpmLbLabel">ATPM 維持能量下限 (mmol/gDW/h)</label>
+          <input type="number" id="atpmLb" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="dxpsUb" data-i18n="dxpsUbLabel">DXPS 上限（MEP 路徑）</label>
+          <input type="number" id="dxpsUb" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="metatUb" data-i18n="metatUbLabel">METAT 上限</label>
+          <input type="number" id="metatUb" step="0.01" min="0">
+        </div>
+        <div class="field">
+          <label for="fppsUb" data-i18n="fppsUbLabel">FPPS 上限（knock-down 目標）</label>
+          <input type="number" id="fppsUb" step="0.01" min="0">
+        </div>
+        <p class="hint" data-i18n="nativeBoundsHint">DXPS／METAT／FPPS 若模型中沒有對應反應會自動略過。</p>
       </div>
 
       <div class="field-group" id="scanFieldGroup" hidden>
@@ -536,7 +683,25 @@ html, body {
             <span class="metric__value metric__value--accent" id="mLimFlux">—</span>
           </div>
         </div>
+
+        <p class="summary-line" id="fbaSummaryLine"></p>
+
         <div id="fbaEnzymeChart" class="chart"></div>
+
+        <div class="chart-grid">
+          <div id="fbaGrowthChart" class="chart"></div>
+          <div id="fbaMediumChart" class="chart"></div>
+          <div id="fbaPathwayChart" class="chart"></div>
+          <div id="fbaCofactorChart" class="chart"></div>
+        </div>
+
+        <details class="report-details">
+          <summary data-i18n="reportDetailsToggle">顯示完整技術報表（文字）</summary>
+          <div class="result-toolbar" style="margin-top: 12px;">
+            <button class="btn-sm" id="fbaReportCopyBtn" data-i18n="copyReport">複製報表文字</button>
+          </div>
+          <pre id="fbaReportBlock" class="report-block"></pre>
+        </details>
       </div>
 
       <div id="dfbaResults" class="result-block" hidden>
@@ -657,6 +822,48 @@ const I18N = {
     exportPng: "匯出圖片",
     exportNoData: "尚無可匯出的結果，請先執行一次",
     compareRunLabel: (n) => `第 ${n} 次`,
+    mediumTitle: "培養基與路徑邊界（可調）",
+    glycerolUptakeLabel: "甘油攝取上限 (mmol/gDW/h)",
+    oxygenUptakeLabel: "氧氣攝取上限 (mmol/gDW/h)",
+    aaUptakeLabel: "豐富培養基胺基酸攝取上限 (mmol/gDW/h)",
+    atpmLbLabel: "ATPM 維持能量下限 (mmol/gDW/h)",
+    dxpsUbLabel: "DXPS 上限（MEP 路徑）",
+    metatUbLabel: "METAT 上限",
+    fppsUbLabel: "FPPS 上限（knock-down 目標）",
+    nativeBoundsHint: "DXPS／METAT／FPPS 若模型中沒有對應反應會自動略過。",
+    copyReport: "複製報表文字",
+    reportCopiedMsg: "報表文字已複製到剪貼簿",
+    reportTitle: (name) => `iEC1356 Limonene Simulation (${name})`,
+    reportMediumHeader: "--- Medium & Environmental Constraints ---",
+    reportMediumLine: (name) => `Medium: ${name}`,
+    reportGlycerolLine: "Glycerol Uptake Limit (EX_glyc_e)",
+    reportOxygenLine: "Oxygen Uptake Limit (EX_o2_e)",
+    reportAtpmLine: "ATPM (Maintenance Energy)",
+    reportPathwayHeader: "--- Enzyme Capacity & Pathway Bounds ---",
+    reportDxpsLine: "DXPS (MEP Pathway): Upper Bound",
+    reportMetatLine: "METAT: Upper Bound",
+    reportFppsLine: "FPPS (Knock-down Target): Upper Bound",
+    reportGppsLine: "GPPS (Heterologous): Upper Bound",
+    reportLimsLine: "LIMS_MS_het (Limonene Synthase): Upper Bound",
+    reportGrowthHeader: "--- Growth & Target Production Results ---",
+    reportMuMaxLine: "Theoretical Maximum Growth Rate",
+    reportMuLine: "Actual Growth Rate During Production",
+    reportYieldLine: "Limonene Theoretical Export Yield",
+    reportCofactorHeader: "--- Cofactor Balance Analysis ---",
+    reportAtpLine: "Total Intracellular ATP Production Rate",
+    reportNadphLine: "Total Intracellular NADPH Production Rate",
+    reportNA: "N/A",
+    reportDetailsToggle: "顯示完整技術報表（文字）",
+    growthGaugeTitle: "生長速率（實際 vs 理論最大）",
+    mediumChartTitle: "培養基攝取上限",
+    pathwayChartTitle: "酵素／路徑上限比較（對數刻度）",
+    cofactorChartTitle: "細胞內 ATP／NADPH 生產速率",
+    pathwayAxisTitle: "Upper bound (log)",
+    cofactorAtpShort: "ATP",
+    cofactorNadphShort: "NADPH",
+    summaryGrowthPart: (pct) => `目前設定下，菌株仍能維持理論最大生長速率的 ${pct}%。`,
+    summaryYieldPart: (y) => `檸檬烯分泌速率約為 ${y} mmol/gDW/h。`,
+    summaryInfeasible: "目前設定下求解不可行，請調整培養基或酵素濃度後再試一次。",
   },
   en: {
     pageTitle: "LimoneneCOBRA · dFBA Console",
@@ -740,6 +947,48 @@ const I18N = {
     exportPng: "Export image",
     exportNoData: "No results to export yet — run it first",
     compareRunLabel: (n) => `Run ${n}`,
+    mediumTitle: "Medium & Pathway Bounds (adjustable)",
+    glycerolUptakeLabel: "Glycerol uptake limit (mmol/gDW/h)",
+    oxygenUptakeLabel: "Oxygen uptake limit (mmol/gDW/h)",
+    aaUptakeLabel: "Rich-medium amino acid uptake limit (mmol/gDW/h)",
+    atpmLbLabel: "ATPM maintenance energy lower bound (mmol/gDW/h)",
+    dxpsUbLabel: "DXPS upper bound (MEP pathway)",
+    metatUbLabel: "METAT upper bound",
+    fppsUbLabel: "FPPS upper bound (knock-down target)",
+    nativeBoundsHint: "DXPS / METAT / FPPS are skipped automatically if not present in the model.",
+    copyReport: "Copy report text",
+    reportCopiedMsg: "Report text copied to clipboard",
+    reportTitle: (name) => `iEC1356 Limonene Simulation (${name})`,
+    reportMediumHeader: "--- Medium & Environmental Constraints ---",
+    reportMediumLine: (name) => `Medium: ${name}`,
+    reportGlycerolLine: "Glycerol Uptake Limit (EX_glyc_e)",
+    reportOxygenLine: "Oxygen Uptake Limit (EX_o2_e)",
+    reportAtpmLine: "ATPM (Maintenance Energy)",
+    reportPathwayHeader: "--- Enzyme Capacity & Pathway Bounds ---",
+    reportDxpsLine: "DXPS (MEP Pathway): Upper Bound",
+    reportMetatLine: "METAT: Upper Bound",
+    reportFppsLine: "FPPS (Knock-down Target): Upper Bound",
+    reportGppsLine: "GPPS (Heterologous): Upper Bound",
+    reportLimsLine: "LIMS_MS_het (Limonene Synthase): Upper Bound",
+    reportGrowthHeader: "--- Growth & Target Production Results ---",
+    reportMuMaxLine: "Theoretical Maximum Growth Rate",
+    reportMuLine: "Actual Growth Rate During Production",
+    reportYieldLine: "Limonene Theoretical Export Yield",
+    reportCofactorHeader: "--- Cofactor Balance Analysis ---",
+    reportAtpLine: "Total Intracellular ATP Production Rate",
+    reportNadphLine: "Total Intracellular NADPH Production Rate",
+    reportNA: "N/A",
+    reportDetailsToggle: "Show full technical report (text)",
+    growthGaugeTitle: "Growth rate (actual vs theoretical max)",
+    mediumChartTitle: "Medium uptake limits",
+    pathwayChartTitle: "Enzyme / pathway bounds (log scale)",
+    cofactorChartTitle: "Intracellular ATP / NADPH production rate",
+    pathwayAxisTitle: "Upper bound (log)",
+    cofactorAtpShort: "ATP",
+    cofactorNadphShort: "NADPH",
+    summaryGrowthPart: (pct) => `At the current settings, the strain retains ${pct}% of its theoretical maximum growth rate.`,
+    summaryYieldPart: (y) => `Limonene secretion rate is about ${y} mmol/gDW/h.`,
+    summaryInfeasible: "The problem is infeasible with the current settings — try adjusting the medium or enzyme concentrations.",
   },
 };
 
@@ -805,23 +1054,62 @@ function modeConfig() {
   };
 }
 
-const PLOTLY_LAYOUT_BASE = {
-  paper_bgcolor: "transparent",
-  plot_bgcolor: "transparent",
-  font: { family: "JetBrains Mono, monospace", color: "#93a69d", size: 11 },
-  margin: { l: 55, r: 20, t: 40, b: 45 },
-  legend: { orientation: "h", y: -0.2 },
-  xaxis: { gridcolor: "#24382f", zerolinecolor: "#2c443c" },
-  yaxis: { gridcolor: "#24382f", zerolinecolor: "#2c443c" },
-};
+/* 讀取目前主題（日／夜）的 CSS 變數值，讓 Plotly 圖表顏色跟著主題切換。
+   每次繪圖前呼叫，而不是快取成常數，這樣切換主題後重繪就能拿到新顏色。 */
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
 
-const ACCENT_COLORS = ["#e8a33d", "#8fbf6b", "#6bb3bf", "#d9756a", "#c79ee8"];
+function isLightTheme() {
+  return document.documentElement.dataset.theme === "light";
+}
+
+function plotlyLayoutBase() {
+  return {
+    paper_bgcolor: "transparent",
+    plot_bgcolor: "transparent",
+    font: { family: "JetBrains Mono, monospace", color: cssVar("--text-muted"), size: 11 },
+    margin: { l: 55, r: 20, t: 40, b: 45 },
+    legend: { orientation: "h", y: -0.2 },
+    xaxis: { gridcolor: cssVar("--border-soft"), zerolinecolor: cssVar("--border") },
+    yaxis: { gridcolor: cssVar("--border-soft"), zerolinecolor: cssVar("--border") },
+  };
+}
+
+function chartTitleColor() {
+  return cssVar("--text");
+}
+
+function accentColors() {
+  // 五色全部取自 NoFold logo：金黃／橄欖綠／淺藍／穗粒橘褐／亮金黃。
+  // 金黃系（第 1、5 色）用 --accent-bright / --accent2-bright，
+  // 不隨日間主題加深，圖表在日夜模式下都維持 logo 原本的鮮亮金黃。
+  return [
+    cssVar("--accent-bright"),
+    cssVar("--leaf"),
+    cssVar("--steel"),
+    cssVar("--danger"),
+    cssVar("--accent2-bright"),
+  ];
+}
+
+/* 固定配色規則：金／綠／藍／紅／紫依序循環（accentColors() 的順序）。
+   任何「同一張圖裡有多個並列分類」的長條圖（例如每個酵素、每個反應各一根柱子）
+   都用這個函式依序取色，不要整張圖只用單一顏色——那樣會看起來像「全黃」，
+   也分不清哪根柱子對應哪個分類。單一數值指標（量表、單一長條比較兩個數）
+   則直接指定語意色（見各圖表註解）。 */
+function categoricalColors(n) {
+  const palette = accentColors();
+  return Array.from({ length: n }, (_, i) => palette[i % palette.length]);
+}
 
 init();
 
 async function init() {
+  initTheme();
   applyStaticI18n();
   bindLangToggle();
+  bindThemeToggle();
   bindModeTabs();
   bindPresetControls();
   bindCompareControls();
@@ -851,8 +1139,45 @@ function bindLangToggle() {
       // 若目前狀態列顯示的是就緒/檢查中，重新以新語言渲染；錯誤訊息維持原文避免誤導。
       if (els.modelStatus.querySelector(".dot--ok")) setStatus("ok", t("ready"));
       else if (els.modelStatus.querySelector(".dot--pending")) setStatus("pending", t("checking"));
+      rerenderAllResults();
     });
   });
+}
+
+/* ================= 日／夜主題切換 ================= */
+const THEME_STORAGE_KEY = "limoneneCobra.theme.v1";
+
+function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_STORAGE_KEY); } catch (err) { /* 忽略讀取失敗 */ }
+  const theme = saved === "light" ? "light" : "dark";
+  document.documentElement.dataset.theme = theme;
+  updateThemeIcon(theme);
+}
+
+function bindThemeToggle() {
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+    document.documentElement.dataset.theme = next;
+    updateThemeIcon(next);
+    try { localStorage.setItem(THEME_STORAGE_KEY, next); } catch (err) { /* 忽略寫入失敗 */ }
+    rerenderAllResults();
+  });
+}
+
+function updateThemeIcon(theme) {
+  // 深色主題顯示太陽（可切換成日間），淺色主題顯示月亮（可切換成夜間）。
+  document.getElementById("themeToggleIcon").innerHTML = theme === "light" ? "&#9789;" : "&#9788;";
+}
+
+/* 圖表、白話總結、技術報表都是用 t() / cssVar() 動態產生文字與顏色，不是 data-i18n
+   靜態屬性，applyStaticI18n() 不會碰到它們。語言或主題切換後，用快取的最近一次結果
+   重新畫過，不必重打 API。哪個 mode 沒有快取結果就跳過。 */
+function rerenderAllResults() {
+  if (state.lastResults.fba) renderFbaAll(state.lastResults.fba);
+  if (state.dfbaHistory.length) renderDfbaCharts();
+  if (state.lastResults.scan) renderScanCharts(state.lastResults.scan);
+  if (state.lastResults.scan2d) renderScan2dCharts(state.lastResults.scan2d);
 }
 
 function setStatus(kind, text) {
@@ -868,6 +1193,14 @@ function populateDefaults(d) {
   document.getElementById("minGrowthFrac").value = d.min_growth_frac;
   document.getElementById("totalTime").value = (d.time_step_h * d.n_steps).toFixed(2);
   document.getElementById("scanValues").value = d.scan_values["LS"].join(", ");
+
+  document.getElementById("glycerolUptake").value = Math.abs(d["maxUptake.EX_glyc_e"]);
+  document.getElementById("oxygenUptake").value = Math.abs(d["maxUptake.EX_o2_e"]);
+  document.getElementById("aaUptake").value = Math.abs(d["sim.richAminoAcidMaxUptake"]);
+  document.getElementById("atpmLb").value = d.atpm_lb;
+  document.getElementById("dxpsUb").value = d.dxps_ub;
+  document.getElementById("metatUb").value = d.metat_ub;
+  document.getElementById("fppsUb").value = d.fpps_ub;
 
   document.getElementById("scanEnzyme").addEventListener("change", (e) => {
     document.getElementById("scanValues").value = d.scan_values[e.target.value].join(", ");
@@ -930,6 +1263,13 @@ function readCommonParams() {
     iptg_start_time_h: Number(document.getElementById("iptgTime").value),
     min_growth_frac: Number(document.getElementById("minGrowthFrac").value),
     n_steps: Math.max(1, Math.round(totalTime / timeStep)),
+    "maxUptake.EX_glyc_e": Number(document.getElementById("glycerolUptake").value),
+    "maxUptake.EX_o2_e": Number(document.getElementById("oxygenUptake").value),
+    "sim.richAminoAcidMaxUptake": Number(document.getElementById("aaUptake").value),
+    atpm_lb: Number(document.getElementById("atpmLb").value),
+    dxps_ub: Number(document.getElementById("dxpsUb").value),
+    metat_ub: Number(document.getElementById("metatUb").value),
+    fpps_ub: Number(document.getElementById("fppsUb").value),
   };
 }
 
@@ -974,21 +1314,230 @@ async function runFba() {
     els.statusHint.textContent = data.message || t("solverStatus", data.status);
   }
 
+  renderFbaAll(data);
+}
+
+/* 把 FBA 結果的所有渲染（指標卡、酵素通量圖、白話總結、圖表化報表、文字報表）
+   集中在一個函式，這樣「執行完後」跟「切換語言後用快取重畫」可以共用同一套邏輯。 */
+function renderFbaAll(data) {
   document.getElementById("mMuMax").textContent = fmt(data.mu_max, 4) + " h⁻¹";
   document.getElementById("mMu").textContent = fmt(data.growth_rate, 4) + " h⁻¹";
   document.getElementById("mLimFlux").textContent = fmt(data.limonene_flux, 5) + " mmol/gDW/h";
 
+  renderFbaEnzymeChart(data);
+  renderFbaReport(data);
+  renderFbaSummary(data);
+  renderFbaCharts(data);
+}
+
+function renderFbaEnzymeChart(data) {
   const enzymes = Object.keys(data.enzyme_fluxes || {});
   const values = enzymes.map((k) => data.enzyme_fluxes[k] ?? 0);
   Plotly.newPlot("fbaEnzymeChart", [{
     type: "bar",
     x: enzymes,
     y: values,
-    marker: { color: ACCENT_COLORS[0] },
+    marker: { color: categoricalColors(enzymes.length) },
   }], {
-    ...PLOTLY_LAYOUT_BASE,
-    title: { text: t("enzymeFluxChart"), font: { size: 13, color: "#edf3ee" } },
+    ...plotlyLayoutBase(),
+    title: { text: t("enzymeFluxChart"), font: { size: 13, color: chartTitleColor() } },
   }, { displayModeBar: false, responsive: true });
+}
+
+/* ---------------- FBA 白話總結 ---------------- */
+function renderFbaSummary(data) {
+  const el = document.getElementById("fbaSummaryLine");
+  if (data.status !== "optimal" || data.mu_max === null || data.mu_max === undefined) {
+    el.textContent = t("summaryInfeasible");
+    return;
+  }
+  const pct = data.mu_max > 0 ? fmt((data.growth_rate / data.mu_max) * 100, 1) : "0.0";
+  el.textContent = `${t("summaryGrowthPart", pct)} ${t("summaryYieldPart", fmt(data.limonene_flux, 4))}`;
+}
+
+/* ---------------- FBA 圖表化報表 ---------------- */
+function renderFbaCharts(data) {
+  const mp = data.medium_pathway_report || {};
+  const cof = data.cofactors || {};
+
+  // 生長速率量表：指針＝實際生產階段生長速率，紅線＝理論最大生長速率。
+  const gaugeMax = Math.max((data.mu_max || 0) * 1.15, 0.01);
+  Plotly.newPlot("fbaGrowthChart", [{
+    type: "indicator",
+    mode: "gauge+number",
+    value: data.growth_rate ?? 0,
+    number: { suffix: " /h", valueformat: ".3f", font: { color: chartTitleColor(), size: 24 } },
+    gauge: {
+      axis: { range: [0, gaugeMax], tickcolor: cssVar("--text-muted"), tickfont: { color: cssVar("--text-muted"), size: 10 } },
+      bar: { color: accentColors()[0] },
+      bgcolor: "transparent",
+      borderwidth: 1,
+      bordercolor: cssVar("--border"),
+      threshold: {
+        line: { color: accentColors()[3], width: 3 },
+        thickness: 0.85,
+        value: data.mu_max ?? 0,
+      },
+    },
+  }], {
+    ...plotlyLayoutBase(),
+    margin: { l: 30, r: 30, t: 50, b: 20 },
+    title: { text: t("growthGaugeTitle"), font: { size: 12.5, color: chartTitleColor() } },
+  }, { displayModeBar: false, responsive: true });
+
+  // 培養基攝取上限（甘油／氧氣，取絕對值方便比較）。
+  const oxygenAbs = Math.abs(mp.oxygen_bounds?.[0] ?? 0);
+  const glycerolAbs = Math.abs(mp.glycerol_bounds?.[0] ?? 0);
+  Plotly.newPlot("fbaMediumChart", [{
+    type: "bar",
+    orientation: "h",
+    y: [t("oxygenUptakeLabel"), t("glycerolUptakeLabel")],
+    x: [oxygenAbs, glycerolAbs],
+    text: [fmt(oxygenAbs, 2), fmt(glycerolAbs, 2)],
+    textposition: "outside",
+    cliponaxis: false,
+    marker: { color: [accentColors()[2], accentColors()[1]] },
+  }], {
+    ...plotlyLayoutBase(),
+    title: { text: t("mediumChartTitle"), font: { size: 13, color: chartTitleColor() } },
+    xaxis: {
+      ...plotlyLayoutBase().xaxis,
+      type: "linear",
+      title: "mmol/gDW/h",
+      range: [0, Math.max(oxygenAbs, glycerolAbs, 1) * 1.4],
+    },
+    yaxis: {
+      ...plotlyLayoutBase().yaxis,
+      type: "category",
+      automargin: true,
+    },
+    margin: { l: 140, r: 60, t: 40, b: 40 },
+  }, { displayModeBar: false, responsive: true });
+
+  // 酵素／路徑上限比較：數值跨了 3 個數量級（0.003 ~ 30），改用對數 Y 軸，
+  // 缺少的反應（模型沒有對應 ID，值為 null）不畫長條，改在該類別下方標註 N/A。
+  const pathwayLabels = ["DXPS", "METAT", "FPPS", "GPPS", "LIMS_MS_het"];
+  const pathwayKeys = ["dxps_ub", "metat_ub", "fpps_ub", "gpps_ub", "lims_ub"];
+  const pathwayValues = pathwayKeys.map((k) => mp[k]);
+  const pathwayLogVals = pathwayValues.map((v) => (v === null || v === undefined || v <= 0 ? null : v));
+  const pathwayText = pathwayValues.map((v) => (v === null || v === undefined ? "" : fmt(v, 3)));
+  const pathwayNaIndices = pathwayValues
+    .map((v, i) => (v === null || v === undefined ? i : null))
+    .filter((i) => i !== null);
+
+  // 對數軸只顯示整數次方的刻度（1, 10, 100 或 0.1, 0.01…），不顯示 2、5 這些次要刻度，避免刻度太密。
+  const posVals = pathwayLogVals.filter((v) => v !== null && v > 0);
+  let tickvals = [1];
+  if (posVals.length) {
+    const minExp = Math.floor(Math.log10(Math.min(...posVals)));
+    const maxExp = Math.ceil(Math.log10(Math.max(...posVals)));
+    tickvals = [];
+    for (let e = minExp; e <= maxExp; e++) tickvals.push(Math.pow(10, e));
+  }
+  const ticktext = tickvals.map((v) => (v >= 1 ? String(v) : v.toString()));
+
+  Plotly.newPlot("fbaPathwayChart", [{
+    type: "bar",
+    x: pathwayLabels,
+    y: pathwayLogVals,
+    text: pathwayText,
+    textposition: "outside",
+    cliponaxis: false,
+    marker: { color: categoricalColors(pathwayLabels.length) },
+  }], {
+    ...plotlyLayoutBase(),
+    title: { text: t("pathwayChartTitle"), font: { size: 13, color: chartTitleColor() } },
+    margin: { l: 60, r: 20, t: 60, b: 45 },
+    xaxis: { ...plotlyLayoutBase().xaxis, type: "category" },
+    yaxis: {
+      ...plotlyLayoutBase().yaxis,
+      type: "log",
+      title: t("pathwayAxisTitle"),
+      tickmode: "array",
+      tickvals,
+      ticktext,
+    },
+    annotations: pathwayNaIndices.map((i) => ({
+      x: pathwayLabels[i], y: 0.04, yref: "paper", yanchor: "bottom",
+      text: t("reportNA"), showarrow: false,
+      font: { color: cssVar("--text-muted"), size: 11 },
+    })),
+  }, { displayModeBar: false, responsive: true });
+
+  // ATP／NADPH 細胞內生產速率比較（短標籤避免 X 軸文字被斜切）。
+  const atpVal = cof.atp_production_mmol_gDW_h ?? 0;
+  const nadphVal = cof.nadph_production_mmol_gDW_h ?? 0;
+  Plotly.newPlot("fbaCofactorChart", [{
+    type: "bar",
+    x: [t("cofactorAtpShort"), t("cofactorNadphShort")],
+    y: [atpVal, nadphVal],
+    text: [fmt(atpVal, 3), fmt(nadphVal, 3)],
+    textposition: "outside",
+    cliponaxis: false,
+    marker: { color: [accentColors()[0], accentColors()[2]] },
+  }], {
+    ...plotlyLayoutBase(),
+    title: { text: t("cofactorChartTitle"), font: { size: 13, color: chartTitleColor() } },
+    margin: { l: 55, r: 20, t: 50, b: 45 },
+    xaxis: { ...plotlyLayoutBase().xaxis, type: "category", tickangle: 0 },
+    yaxis: {
+      ...plotlyLayoutBase().yaxis,
+      type: "linear",
+      title: "mmol/gDW/h",
+      range: [0, Math.max(atpVal, nadphVal, 1) * 1.2],
+    },
+  }, { displayModeBar: false, responsive: true });
+
+  // 保險：容器剛從隱藏切出來或版面還沒穩定時，尺寸量測可能不準，
+  // 下一輪 frame 強制 resize 一次，避免座標軸跟長條跑版。
+  requestAnimationFrame(() => {
+    ["fbaGrowthChart", "fbaMediumChart", "fbaPathwayChart", "fbaCofactorChart"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el && el.data) Plotly.Plots.resize(el);
+    });
+  });
+}
+
+/* ---------------- FBA 文字報表 ---------------- */
+function fmtBounds(b) {
+  if (!b) return t("reportNA");
+  return `[${fmt(b[0], 2)}, ${fmt(b[1], 2)}]`;
+}
+
+function fmtOrNA(v, digits) {
+  if (v === null || v === undefined || Number.isNaN(v)) return t("reportNA");
+  return fmt(v, digits);
+}
+
+function renderFbaReport(data) {
+  const mp = data.medium_pathway_report || {};
+  const cof = data.cofactors || {};
+  const lines = [
+    t("reportTitle", mp.medium_name || t("reportNA")),
+    "",
+    t("reportMediumHeader"),
+    t("reportMediumLine", mp.medium_name || t("reportNA")),
+    `${t("reportGlycerolLine")}: ${fmtBounds(mp.glycerol_bounds)} mmol/gDW/h`,
+    `${t("reportOxygenLine")}: ${fmtBounds(mp.oxygen_bounds)} mmol/gDW/h`,
+    `${t("reportAtpmLine")}: ${fmtOrNA(mp.atpm_lb, 2)} mmol/gDW/h (Lower Bound)`,
+    "",
+    t("reportPathwayHeader"),
+    `${t("reportDxpsLine")} = ${fmtOrNA(mp.dxps_ub, 2)}`,
+    `${t("reportMetatLine")} = ${fmtOrNA(mp.metat_ub, 2)}`,
+    `${t("reportFppsLine")} = ${fmtOrNA(mp.fpps_ub, 2)}`,
+    `${t("reportGppsLine")} = ${fmtOrNA(mp.gpps_ub, 2)}`,
+    `${t("reportLimsLine")} = ${fmtOrNA(mp.lims_ub, 2)}`,
+    "",
+    t("reportGrowthHeader"),
+    `${t("reportMuMaxLine")}: ${fmtOrNA(data.mu_max, 4)} h^-1`,
+    `${t("reportMuLine")}: ${fmtOrNA(data.growth_rate, 4)} h^-1`,
+    `${t("reportYieldLine")}: ${fmtOrNA(data.limonene_flux, 4)} mmol/gDW/h`,
+    "",
+    t("reportCofactorHeader"),
+    `${t("reportAtpLine")}: ${fmtOrNA(cof.atp_production_mmol_gDW_h, 4)} mmol/gDW/h`,
+    `${t("reportNadphLine")}: ${fmtOrNA(cof.nadph_production_mmol_gDW_h, 4)} mmol/gDW/h`,
+  ];
+  document.getElementById("fbaReportBlock").textContent = lines.join("\n");
 }
 
 /* ---------------- dFBA ---------------- */
@@ -1001,29 +1550,43 @@ async function runDfba() {
   state.dfbaHistory.push({ runNo: state.dfbaHistory.length + 1, ...data });
   els.compareClearRow.hidden = state.dfbaHistory.length === 0;
 
+  renderDfbaCharts(data);
+
+  if (data.stopped_reason) {
+    els.statusHint.className = "hint hint--error";
+    els.statusHint.textContent = t("stoppedEarly", data.stopped_reason);
+  }
+}
+
+/* 把 dFBA 圖表渲染獨立出來，這樣切換語言後可以用 state.dfbaHistory 重畫，
+   不用重新打 API。latestData 只在單次執行（非疊圖）模式下用來畫完整三軸曲線。 */
+function renderDfbaCharts(latestData) {
+  const data = latestData || state.dfbaHistory[state.dfbaHistory.length - 1];
+  if (!data) return;
+
   if (state.dfbaHistory.length <= 1) {
     // 單次執行：原本三軸完整曲線。
     Plotly.newPlot("dfbaConcChart", [
-      { x: data.time_h, y: data.limonene_mM, name: t("limoneneLegend"), line: { color: ACCENT_COLORS[0], width: 2.5 } },
-      { x: data.time_h, y: data.biomass_gDW_L, name: t("biomassLegend"), yaxis: "y2", line: { color: ACCENT_COLORS[1], width: 2 } },
-      { x: data.time_h, y: data.glycerol_mM, name: t("glycerolLegend"), yaxis: "y3", line: { color: ACCENT_COLORS[2], width: 1.5, dash: "dot" } },
+      { x: data.time_h, y: data.limonene_mM, name: t("limoneneLegend"), line: { color: accentColors()[0], width: 2.5 } },
+      { x: data.time_h, y: data.biomass_gDW_L, name: t("biomassLegend"), yaxis: "y2", line: { color: accentColors()[1], width: 2 } },
+      { x: data.time_h, y: data.glycerol_mM, name: t("glycerolLegend"), yaxis: "y3", line: { color: accentColors()[2], width: 1.5, dash: "dot" } },
     ], {
-      ...PLOTLY_LAYOUT_BASE,
-      title: { text: t("concChartTitle"), font: { size: 13, color: "#edf3ee" } },
-      xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: t("timeAxis") },
-      yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: t("limoneneAxis") },
+      ...plotlyLayoutBase(),
+      title: { text: t("concChartTitle"), font: { size: 13, color: chartTitleColor() } },
+      xaxis: { ...plotlyLayoutBase().xaxis, title: t("timeAxis") },
+      yaxis: { ...plotlyLayoutBase().yaxis, title: t("limoneneAxis") },
       yaxis2: { overlaying: "y", side: "right", showgrid: false, title: t("biomassAxis") },
       yaxis3: { overlaying: "y", side: "right", position: 1, showgrid: false, visible: false },
     }, { displayModeBar: false, responsive: true });
 
     Plotly.newPlot("dfbaFluxChart", [
-      { x: data.time_h, y: data.limonene_flux, name: t("limFluxLegend"), line: { color: ACCENT_COLORS[0], width: 2 } },
-      { x: data.time_h, y: data.growth_rate_h, name: t("growthRateLegend"), yaxis: "y2", line: { color: ACCENT_COLORS[1], width: 2 } },
+      { x: data.time_h, y: data.limonene_flux, name: t("limFluxLegend"), line: { color: accentColors()[0], width: 2 } },
+      { x: data.time_h, y: data.growth_rate_h, name: t("growthRateLegend"), yaxis: "y2", line: { color: accentColors()[1], width: 2 } },
     ], {
-      ...PLOTLY_LAYOUT_BASE,
-      title: { text: t("fluxChartTitle"), font: { size: 13, color: "#edf3ee" } },
-      xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: t("timeAxis") },
-      yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: "mmol/gDW/h" },
+      ...plotlyLayoutBase(),
+      title: { text: t("fluxChartTitle"), font: { size: 13, color: chartTitleColor() } },
+      xaxis: { ...plotlyLayoutBase().xaxis, title: t("timeAxis") },
+      yaxis: { ...plotlyLayoutBase().yaxis, title: "mmol/gDW/h" },
       yaxis2: { overlaying: "y", side: "right", showgrid: false, title: "h⁻¹" },
     }, { displayModeBar: false, responsive: true });
   } else {
@@ -1031,31 +1594,26 @@ async function runDfba() {
     const concTraces = state.dfbaHistory.map((run, i) => ({
       x: run.time_h, y: run.limonene_mM,
       name: `${t("compareRunLabel", run.runNo)} · ${t("limoneneLegend")}`,
-      line: { color: ACCENT_COLORS[i % ACCENT_COLORS.length], width: 2 },
+      line: { color: accentColors()[i % accentColors().length], width: 2 },
     }));
     Plotly.newPlot("dfbaConcChart", concTraces, {
-      ...PLOTLY_LAYOUT_BASE,
-      title: { text: t("concChartTitle"), font: { size: 13, color: "#edf3ee" } },
-      xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: t("timeAxis") },
-      yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: t("limoneneAxis") },
+      ...plotlyLayoutBase(),
+      title: { text: t("concChartTitle"), font: { size: 13, color: chartTitleColor() } },
+      xaxis: { ...plotlyLayoutBase().xaxis, title: t("timeAxis") },
+      yaxis: { ...plotlyLayoutBase().yaxis, title: t("limoneneAxis") },
     }, { displayModeBar: false, responsive: true });
 
     const fluxTraces = state.dfbaHistory.map((run, i) => ({
       x: run.time_h, y: run.limonene_flux,
       name: `${t("compareRunLabel", run.runNo)} · ${t("limFluxLegend")}`,
-      line: { color: ACCENT_COLORS[i % ACCENT_COLORS.length], width: 2 },
+      line: { color: accentColors()[i % accentColors().length], width: 2 },
     }));
     Plotly.newPlot("dfbaFluxChart", fluxTraces, {
-      ...PLOTLY_LAYOUT_BASE,
-      title: { text: t("fluxChartTitle"), font: { size: 13, color: "#edf3ee" } },
-      xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: t("timeAxis") },
-      yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: "mmol/gDW/h" },
+      ...plotlyLayoutBase(),
+      title: { text: t("fluxChartTitle"), font: { size: 13, color: chartTitleColor() } },
+      xaxis: { ...plotlyLayoutBase().xaxis, title: t("timeAxis") },
+      yaxis: { ...plotlyLayoutBase().yaxis, title: "mmol/gDW/h" },
     }, { displayModeBar: false, responsive: true });
-  }
-
-  if (data.stopped_reason) {
-    els.statusHint.className = "hint hint--error";
-    els.statusHint.textContent = t("stoppedEarly", data.stopped_reason);
   }
 }
 
@@ -1067,33 +1625,37 @@ async function runScan() {
   const params = readCommonParams();
   const data = await postJson("/api/etot-scan", { enzyme, scan_values: scanValues, params });
   state.lastResults.scan = { enzyme, results: data.results };
+  renderScanCharts(state.lastResults.scan);
+}
 
-  const trajTraces = data.results.map((r, i) => ({
+function renderScanCharts(scanData) {
+  const enzyme = scanData.enzyme;
+  const trajTraces = scanData.results.map((r, i) => ({
     x: r.trace.time_h,
     y: r.trace.limonene_mM,
     name: `Etot = ${r.etot_uM} µM`,
-    line: { color: ACCENT_COLORS[i % ACCENT_COLORS.length], width: 2 },
+    line: { color: accentColors()[i % accentColors().length], width: 2 },
   }));
   Plotly.newPlot("scanTrajChart", trajTraces, {
-    ...PLOTLY_LAYOUT_BASE,
-    title: { text: t("scanTrajTitle", enzyme), font: { size: 13, color: "#edf3ee" } },
-    xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: t("timeAxis") },
-    yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: t("extracellularLimAxis") },
+    ...plotlyLayoutBase(),
+    title: { text: t("scanTrajTitle", enzyme), font: { size: 13, color: chartTitleColor() } },
+    xaxis: { ...plotlyLayoutBase().xaxis, title: t("timeAxis") },
+    yaxis: { ...plotlyLayoutBase().yaxis, title: t("extracellularLimAxis") },
   }, { displayModeBar: false, responsive: true });
 
-  const etotVals = data.results.map((r) => r.etot_uM);
-  const finalLim = data.results.map((r) => r.final_limonene_mM);
-  const maxFlux = data.results.map((r) => r.max_post_iptg_flux);
+  const etotVals = scanData.results.map((r) => r.etot_uM);
+  const finalLim = scanData.results.map((r) => r.final_limonene_mM);
+  const maxFlux = scanData.results.map((r) => r.max_post_iptg_flux);
   Plotly.newPlot("scanEndpointChart", [
     { x: etotVals, y: maxFlux, name: t("maxFluxLegend"), type: "scatter", mode: "lines+markers",
-      line: { color: ACCENT_COLORS[0] } },
+      line: { color: accentColors()[0] } },
     { x: etotVals, y: finalLim, name: t("finalLimLegend"), yaxis: "y2", type: "scatter", mode: "lines+markers",
-      line: { color: ACCENT_COLORS[1], dash: "dash" } },
+      line: { color: accentColors()[1], dash: "dash" } },
   ], {
-    ...PLOTLY_LAYOUT_BASE,
-    title: { text: t("scanEndpointTitle", enzyme), font: { size: 13, color: "#edf3ee" } },
-    xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: `${enzyme} Etot (µM)`, type: "log" },
-    yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: "mmol/gDW/h" },
+    ...plotlyLayoutBase(),
+    title: { text: t("scanEndpointTitle", enzyme), font: { size: 13, color: chartTitleColor() } },
+    xaxis: { ...plotlyLayoutBase().xaxis, title: `${enzyme} Etot (µM)`, type: "log" },
+    yaxis: { ...plotlyLayoutBase().yaxis, title: "mmol/gDW/h" },
     yaxis2: { overlaying: "y", side: "right", showgrid: false, title: "mM" },
   }, { displayModeBar: false, responsive: true });
 }
@@ -1114,7 +1676,12 @@ async function runScan2d() {
     values_x: valuesX, values_y: valuesY, params,
   });
   state.lastResults.scan2d = data;
+  renderScan2dCharts(data);
+}
 
+function renderScan2dCharts(data) {
+  const enzymeX = data.enzyme_x;
+  const enzymeY = data.enzyme_y;
   const xLabels = data.values_x.map((v) => `${v}`);
   const yLabels = data.values_y.map((v) => `${v}`);
 
@@ -1123,13 +1690,13 @@ async function runScan2d() {
     x: xLabels,
     y: yLabels,
     z: data.final_limonene_mM,
-    colorscale: [[0, "#192e28"], [1, "#e8a33d"]],
+    colorscale: [[0, cssVar("--bg-panel")], [1, cssVar("--accent")]],
     colorbar: { title: "mM", titleside: "right" },
   }], {
-    ...PLOTLY_LAYOUT_BASE,
-    title: { text: t("scan2dFinalTitle", enzymeX, enzymeY), font: { size: 13, color: "#edf3ee" } },
-    xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: `${enzymeX} Etot (µM)` },
-    yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: `${enzymeY} Etot (µM)` },
+    ...plotlyLayoutBase(),
+    title: { text: t("scan2dFinalTitle", enzymeX, enzymeY), font: { size: 13, color: chartTitleColor() } },
+    xaxis: { ...plotlyLayoutBase().xaxis, title: `${enzymeX} Etot (µM)` },
+    yaxis: { ...plotlyLayoutBase().yaxis, title: `${enzymeY} Etot (µM)` },
   }, { displayModeBar: false, responsive: true });
 
   Plotly.newPlot("scan2dFluxHeatmap", [{
@@ -1137,13 +1704,13 @@ async function runScan2d() {
     x: xLabels,
     y: yLabels,
     z: data.max_post_iptg_flux,
-    colorscale: [[0, "#192e28"], [1, "#8fbf6b"]],
+    colorscale: [[0, cssVar("--bg-panel")], [1, cssVar("--leaf")]],
     colorbar: { title: "mmol/gDW/h", titleside: "right" },
   }], {
-    ...PLOTLY_LAYOUT_BASE,
-    title: { text: t("scan2dFluxTitle", enzymeX, enzymeY), font: { size: 13, color: "#edf3ee" } },
-    xaxis: { ...PLOTLY_LAYOUT_BASE.xaxis, title: `${enzymeX} Etot (µM)` },
-    yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, title: `${enzymeY} Etot (µM)` },
+    ...plotlyLayoutBase(),
+    title: { text: t("scan2dFluxTitle", enzymeX, enzymeY), font: { size: 13, color: chartTitleColor() } },
+    xaxis: { ...plotlyLayoutBase().xaxis, title: `${enzymeX} Etot (µM)` },
+    yaxis: { ...plotlyLayoutBase().yaxis, title: `${enzymeY} Etot (µM)` },
   }, { displayModeBar: false, responsive: true });
 }
 
@@ -1187,6 +1754,13 @@ function getCurrentParamSnapshot() {
     scanValuesX: document.getElementById("scanValuesX").value,
     scanEnzymeY: document.getElementById("scanEnzymeY").value,
     scanValuesY: document.getElementById("scanValuesY").value,
+    glycerolUptake: document.getElementById("glycerolUptake").value,
+    oxygenUptake: document.getElementById("oxygenUptake").value,
+    aaUptake: document.getElementById("aaUptake").value,
+    atpmLb: document.getElementById("atpmLb").value,
+    dxpsUb: document.getElementById("dxpsUb").value,
+    metatUb: document.getElementById("metatUb").value,
+    fppsUb: document.getElementById("fppsUb").value,
   };
 }
 
@@ -1208,6 +1782,13 @@ function applyParamSnapshot(snap) {
   setIf("scanValuesX", snap.scanValuesX);
   setIf("scanEnzymeY", snap.scanEnzymeY);
   setIf("scanValuesY", snap.scanValuesY);
+  setIf("glycerolUptake", snap.glycerolUptake);
+  setIf("oxygenUptake", snap.oxygenUptake);
+  setIf("aaUptake", snap.aaUptake);
+  setIf("atpmLb", snap.atpmLb);
+  setIf("dxpsUb", snap.dxpsUb);
+  setIf("metatUb", snap.metatUb);
+  setIf("fppsUb", snap.fppsUb);
   if (snap.mode) {
     const btn = els.modeTabs.querySelector(`.mode-tab[data-mode="${snap.mode}"]`);
     if (btn) btn.click();
@@ -1294,6 +1875,13 @@ function buildShareUrl() {
   params.set("svx", snap.scanValuesX);
   params.set("sey", snap.scanEnzymeY);
   params.set("svy", snap.scanValuesY);
+  params.set("glyc", snap.glycerolUptake);
+  params.set("o2", snap.oxygenUptake);
+  params.set("aa", snap.aaUptake);
+  params.set("atpm", snap.atpmLb);
+  params.set("dxps", snap.dxpsUb);
+  params.set("metat", snap.metatUb);
+  params.set("fpps", snap.fppsUb);
   const url = new URL(window.location.href);
   url.search = params.toString();
   return url.toString();
@@ -1325,6 +1913,13 @@ function applyUrlParams() {
     scanValuesX: params.get("svx") || undefined,
     scanEnzymeY: params.get("sey") || undefined,
     scanValuesY: params.get("svy") || undefined,
+    glycerolUptake: params.get("glyc") || undefined,
+    oxygenUptake: params.get("o2") || undefined,
+    aaUptake: params.get("aa") || undefined,
+    atpmLb: params.get("atpm") || undefined,
+    dxpsUb: params.get("dxps") || undefined,
+    metatUb: params.get("metat") || undefined,
+    fppsUb: params.get("fpps") || undefined,
   });
 }
 
@@ -1335,6 +1930,17 @@ function bindExportControls() {
   });
   document.querySelectorAll("[data-export-png]").forEach((btn) => {
     btn.addEventListener("click", () => exportPng(btn.dataset.exportPng));
+  });
+  document.getElementById("fbaReportCopyBtn").addEventListener("click", () => {
+    const text = document.getElementById("fbaReportBlock").textContent;
+    if (!text) { flashHint(t("exportNoData"), true); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(() => flashHint(t("reportCopiedMsg"), false))
+        .catch(() => window.prompt(t("reportCopiedMsg"), text));
+    } else {
+      window.prompt(t("reportCopiedMsg"), text);
+    }
   });
 }
 
@@ -1369,6 +1975,16 @@ function exportCsv(mode) {
     rows.push(["mu_max_h-1", data.mu_max]);
     rows.push(["growth_rate_h-1", data.growth_rate]);
     rows.push(["limonene_flux_mmol_gDW_h", data.limonene_flux]);
+    const cof = data.cofactors || {};
+    rows.push(["atp_production_mmol_gDW_h", cof.atp_production_mmol_gDW_h]);
+    rows.push(["nadph_production_mmol_gDW_h", cof.nadph_production_mmol_gDW_h]);
+    const mp = data.medium_pathway_report || {};
+    rows.push(["glycerol_bounds", mp.glycerol_bounds ? mp.glycerol_bounds.join("/") : ""]);
+    rows.push(["oxygen_bounds", mp.oxygen_bounds ? mp.oxygen_bounds.join("/") : ""]);
+    rows.push(["atpm_lb", mp.atpm_lb]);
+    rows.push(["dxps_ub", mp.dxps_ub]);
+    rows.push(["metat_ub", mp.metat_ub]);
+    rows.push(["fpps_ub", mp.fpps_ub]);
     csv = rowsToCsv(["metric", "value"], rows);
     filename = "fba_result.csv";
   } else if (mode === "dfba") {
