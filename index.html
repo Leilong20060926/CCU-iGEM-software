@@ -479,6 +479,43 @@ html, body {
   margin-top: 4px;
 }
 
+.data-table-wrap {
+  margin-top: 4px;
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel-raised);
+  color: var(--text-muted);
+  text-align: right;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+.data-table thead th:first-child { text-align: left; }
+.data-table tbody td {
+  text-align: right;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text);
+}
+.data-table tbody td:first-child {
+  text-align: left;
+  color: var(--text-muted);
+}
+.data-table tbody tr:hover td { background: var(--accent-soft); }
+
 .summary-line {
   background: var(--bg-panel-raised);
   border: 1px solid var(--border);
@@ -620,6 +657,10 @@ html, body {
       <span class="mode-tab__label" data-i18n="modeScan2dLabel">雙酵素掃描</span>
       <span class="mode-tab__desc" data-i18n="modeScan2dDesc">雙酵素交叉掃描 (2D)</span>
     </button>
+    <button class="mode-tab" data-mode="optimize">
+      <span class="mode-tab__label" data-i18n="modeOptimizeLabel">自動最佳化</span>
+      <span class="mode-tab__desc" data-i18n="modeOptimizeDesc">Nelder-Mead 找最佳 Etot</span>
+    </button>
   </nav>
 
   <main class="layout">
@@ -745,6 +786,15 @@ html, body {
         </div>
       </div>
 
+      <div class="field-group" id="optimizeFieldGroup" hidden>
+        <h2 class="field-group__title" data-i18n="optimizeTitle">自動最佳化設定</h2>
+        <div class="field">
+          <label for="optimizeMaxIter" data-i18n="optimizeMaxIterLabel">最大迭代次數</label>
+          <input type="number" id="optimizeMaxIter" step="10" min="50" max="600" value="200">
+        </div>
+        <p class="hint" data-i18n="optimizeHint">從目前 Etot 欄位的數值開始搜尋，用穩態 FBA（非 dFBA）當目標函數，找出讓限烯烴通量最大化的 Etot(DXS/IDI/GPPS/LS) 組合。次數越多越準，但也越慢。</p>
+      </div>
+
       <div class="field-group">
         <h2 class="field-group__title" data-i18n="inductionTitle">誘導與生長設定</h2>
         <div class="field" id="inducedField">
@@ -765,6 +815,13 @@ html, body {
         <div class="field" id="durationField">
           <label for="totalTime" data-i18n="totalTimeLabel">模擬總時長 (h)</label>
           <input type="number" id="totalTime" step="0.5" min="0.5">
+        </div>
+        <div class="field" id="stepModeField">
+          <label for="stepMode" data-i18n="stepModeLabel">dFBA 時間步長方法</label>
+          <select id="stepMode">
+            <option value="fixed" data-i18n="stepModeFixed">固定步長（對照 MATLAB 參考結果）</option>
+            <option value="adaptive" data-i18n="stepModeAdaptive">自適應步長（較快，數值不逐位對齊）</option>
+          </select>
         </div>
       </div>
 
@@ -825,6 +882,11 @@ html, body {
           </div>
           <pre id="fbaReportBlock" class="report-block"></pre>
         </details>
+
+        <details class="report-details">
+          <summary data-i18n="rawDataToggle">顯示原始數據表格</summary>
+          <div class="data-table-wrap" id="fbaDataTable"></div>
+        </details>
       </div>
 
       <div id="dfbaResults" class="result-block" hidden>
@@ -832,8 +894,31 @@ html, body {
           <button class="btn-sm" data-export-csv="dfba" data-i18n="exportCsv">匯出 CSV</button>
           <button class="btn-sm" data-export-png="dfbaResults" data-i18n="exportPng">匯出圖片</button>
         </div>
+
+        <div class="metric-row" id="dfbaMetricRow">
+          <div class="metric">
+            <span class="metric__label" data-i18n="dfbaFinalTiterLabel">最終限烯烴濃度（總產量）</span>
+            <span class="metric__value metric__value--accent" id="mDfbaFinalTiter">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric__label" data-i18n="dfbaFinalBiomassLabel">最終生物量</span>
+            <span class="metric__value" id="mDfbaFinalBiomass">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric__label" data-i18n="dfbaSimTimeLabel">模擬總時長</span>
+            <span class="metric__value" id="mDfbaSimTime">—</span>
+          </div>
+        </div>
+
+        <div id="dfbaYieldChart" class="chart"></div>
         <div id="dfbaConcChart" class="chart"></div>
         <div id="dfbaFluxChart" class="chart"></div>
+        <div id="dfbaT7FluxChart" class="chart"></div>
+
+        <details class="report-details">
+          <summary data-i18n="rawDataToggle">顯示原始數據表格</summary>
+          <div class="data-table-wrap" id="dfbaDataTable"></div>
+        </details>
       </div>
 
       <div id="scanResults" class="result-block" hidden>
@@ -843,6 +928,11 @@ html, body {
         </div>
         <div id="scanTrajChart" class="chart"></div>
         <div id="scanEndpointChart" class="chart"></div>
+
+        <details class="report-details">
+          <summary data-i18n="rawDataToggle">顯示原始數據表格</summary>
+          <div class="data-table-wrap" id="scanDataTable"></div>
+        </details>
       </div>
 
       <div id="scan2dResults" class="result-block" hidden>
@@ -852,6 +942,45 @@ html, body {
         </div>
         <div id="scan2dFinalHeatmap" class="chart"></div>
         <div id="scan2dFluxHeatmap" class="chart"></div>
+
+        <details class="report-details">
+          <summary data-i18n="rawDataToggle">顯示原始數據表格</summary>
+          <div class="data-table-wrap" id="scan2dDataTable"></div>
+        </details>
+      </div>
+
+      <div id="optimizeResults" class="result-block" hidden>
+        <div class="result-toolbar">
+          <button class="btn-sm" data-export-csv="optimize" data-i18n="exportCsv">匯出 CSV</button>
+          <button class="btn-sm" data-export-png="optimizeResults" data-i18n="exportPng">匯出圖片</button>
+        </div>
+
+        <div class="metric-row" id="optimizeMetricRow">
+          <div class="metric">
+            <span class="metric__label" data-i18n="optimizeBestFluxLabel">最佳限烯烴通量</span>
+            <span class="metric__value metric__value--accent" id="mOptimizeFlux">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric__label" data-i18n="optimizeEvalsLabel">評估次數</span>
+            <span class="metric__value" id="mOptimizeEvals">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric__label" data-i18n="optimizeConvergedLabel">是否收斂</span>
+            <span class="metric__value" id="mOptimizeConverged">—</span>
+          </div>
+        </div>
+
+        <div id="optimizeBestEtotChart" class="chart"></div>
+        <div id="optimizeConvergeChart" class="chart"></div>
+
+        <div class="result-toolbar" style="margin-top: 12px;">
+          <button class="btn-sm btn-sm--accent" id="optimizeApplyBtn" data-i18n="optimizeApplyBtn">套用這組最佳 Etot</button>
+        </div>
+
+        <details class="report-details">
+          <summary data-i18n="rawDataToggle">顯示原始數據表格</summary>
+          <div class="data-table-wrap" id="optimizeDataTable"></div>
+        </details>
       </div>
 
     </section>
@@ -970,6 +1099,25 @@ const I18N = {
     modeScanDesc: "單酵素 OAT 廣域掃描",
     modeScan2dLabel: "雙酵素掃描",
     modeScan2dDesc: "雙酵素交叉掃描 (2D)",
+    modeOptimizeLabel: "自動最佳化",
+    modeOptimizeDesc: "Nelder-Mead 找最佳 Etot",
+    runOptimize: "執行自動最佳化",
+    optimizeTitle: "自動最佳化設定",
+    optimizeMaxIterLabel: "最大迭代次數",
+    optimizeHint: "從目前 Etot 欄位的數值開始搜尋，用穩態 FBA（非 dFBA）當目標函數，找出讓限烯烴通量最大化的 Etot(DXS/IDI/GPPS/LS) 組合。次數越多越準，但也越慢。",
+    optimizeBestFluxLabel: "最佳限烯烴通量",
+    optimizeEvalsLabel: "評估次數",
+    optimizeConvergedLabel: "是否收斂",
+    optimizeConvergedYes: "已收斂",
+    optimizeConvergedNo: "未收斂（可嘗試提高迭代次數）",
+    optimizeApplyBtn: "套用這組最佳 Etot",
+    optimizeApplied: "已套用最佳 Etot 到參數欄位",
+    optimizeBestEtotChartTitle: "最佳 Etot 組合",
+    optimizeConvergeChartTitle: "收斂過程（每次評估的限烯烴通量）",
+    optimizeBestFluxTrace: "目前為止最佳值",
+    stepModeLabel: "dFBA 時間步長方法",
+    stepModeFixed: "固定步長（對照 MATLAB 參考結果）",
+    stepModeAdaptive: "自適應步長（較快，數值不逐位對齊）",
     etotTitle: "酵素總濃度 Etot (µM)",
     lsLabel: "LS（檸檬烯合成酶）",
     scanTitle: "掃描設定",
@@ -1071,6 +1219,20 @@ const I18N = {
     reportNadphLine: "Total Intracellular NADPH Production Rate",
     reportNA: "N/A",
     reportDetailsToggle: "顯示完整技術報表（文字）",
+    rawDataToggle: "顯示原始數據表格",
+    t7FluxChartTitle: "各酵素通量隨時間變化",
+    t7FluxDXS: "DXS 通量",
+    t7FluxIDIFwd: "IDI（IPP→DMAPP）通量",
+    t7FluxIDIRev: "IDI（DMAPP→IPP）通量",
+    t7FluxGPPS: "GPPS 通量",
+    t7FluxLS: "LS 通量",
+    rawDataMetricCol: "項目",
+    rawDataValueCol: "數值",
+    rawDataScan2dNote: "表格只列出終點限烯烴濃度矩陣；最大誘導後通量矩陣請用「匯出 CSV」查看完整資料。",
+    dfbaFinalTiterLabel: "最終限烯烴濃度（總產量）",
+    dfbaFinalBiomassLabel: "最終生物量",
+    dfbaSimTimeLabel: "模擬總時長",
+    dfbaYieldChartTitle: "各次執行總產量比較",
     growthGaugeTitle: "生長速率（實際 vs 理論最大）",
     mediumChartTitle: "培養基攝取上限",
     pathwayChartTitle: "酵素／路徑上限比較（對數刻度）",
@@ -1117,6 +1279,25 @@ const I18N = {
     modeScanDesc: "Single-enzyme OAT wide-range scan",
     modeScan2dLabel: "Dual-Enzyme Scan",
     modeScan2dDesc: "Cross-scan two enzymes (2D)",
+    modeOptimizeLabel: "Auto-optimize",
+    modeOptimizeDesc: "Nelder-Mead search for best Etot",
+    runOptimize: "Run auto-optimize",
+    optimizeTitle: "Auto-optimize settings",
+    optimizeMaxIterLabel: "Max iterations",
+    optimizeHint: "Starts from the current Etot field values and uses steady-state FBA (not dFBA) as the objective function, searching for the Etot(DXS/IDI/GPPS/LS) combination that maximizes limonene flux. More iterations = more accurate but slower.",
+    optimizeBestFluxLabel: "Best limonene flux",
+    optimizeEvalsLabel: "Evaluations",
+    optimizeConvergedLabel: "Converged",
+    optimizeConvergedYes: "Converged",
+    optimizeConvergedNo: "Not converged (try more iterations)",
+    optimizeApplyBtn: "Apply this best Etot",
+    optimizeApplied: "Applied the best Etot to the parameter fields",
+    optimizeBestEtotChartTitle: "Best Etot combination",
+    optimizeConvergeChartTitle: "Convergence (limonene flux per evaluation)",
+    optimizeBestFluxTrace: "Best so far",
+    stepModeLabel: "dFBA time-step method",
+    stepModeFixed: "Fixed step (matches MATLAB reference)",
+    stepModeAdaptive: "Adaptive step (faster, not bit-for-bit aligned)",
     etotTitle: "Total Enzyme Concentration Etot (µM)",
     lsLabel: "LS (Limonene Synthase)",
     scanTitle: "Scan Settings",
@@ -1218,6 +1399,20 @@ const I18N = {
     reportNadphLine: "Total Intracellular NADPH Production Rate",
     reportNA: "N/A",
     reportDetailsToggle: "Show full technical report (text)",
+    rawDataToggle: "Show raw data table",
+    t7FluxChartTitle: "Per-enzyme flux over time",
+    t7FluxDXS: "DXS flux",
+    t7FluxIDIFwd: "IDI (IPP→DMAPP) flux",
+    t7FluxIDIRev: "IDI (DMAPP→IPP) flux",
+    t7FluxGPPS: "GPPS flux",
+    t7FluxLS: "LS flux",
+    rawDataMetricCol: "Metric",
+    rawDataValueCol: "Value",
+    rawDataScan2dNote: "This table only lists the final limonene concentration matrix; use \"Export CSV\" for the full max post-IPTG flux matrix too.",
+    dfbaFinalTiterLabel: "Final limonene titer (total yield)",
+    dfbaFinalBiomassLabel: "Final biomass",
+    dfbaSimTimeLabel: "Total simulated time",
+    dfbaYieldChartTitle: "Total yield by run",
     growthGaugeTitle: "Growth rate (actual vs theoretical max)",
     mediumChartTitle: "Medium uptake limits",
     pathwayChartTitle: "Enzyme / pathway bounds (log scale)",
@@ -1293,6 +1488,8 @@ const els = {
   statusHint: document.getElementById("statusHint"),
   scanFieldGroup: document.getElementById("scanFieldGroup"),
   scan2dFieldGroup: document.getElementById("scan2dFieldGroup"),
+  optimizeFieldGroup: document.getElementById("optimizeFieldGroup"),
+  stepModeField: document.getElementById("stepModeField"),
   inducedField: document.getElementById("inducedField"),
   durationField: document.getElementById("durationField"),
   fbaResults: document.getElementById("fbaResults"),
@@ -1312,6 +1509,7 @@ function modeConfig() {
     dfba: { label: t("runDfba"), resultBlock: "dfbaResults" },
     scan: { label: t("runScan"), resultBlock: "scanResults" },
     scan2d: { label: t("runScan2d"), resultBlock: "scan2dResults" },
+    optimize: { label: t("runOptimize"), resultBlock: "optimizeResults" },
   };
 }
 
@@ -1472,6 +1670,7 @@ function rerenderAllResults() {
   if (state.dfbaHistory.length) renderDfbaCharts();
   if (state.lastResults.scan) renderScanCharts(state.lastResults.scan);
   if (state.lastResults.scan2d) renderScan2dCharts(state.lastResults.scan2d);
+  if (state.lastResults.optimize) renderOptimizeResults(state.lastResults.optimize);
 }
 
 function setStatus(kind, text) {
@@ -1528,12 +1727,16 @@ function updateModeUI() {
 
   els.scanFieldGroup.hidden = state.mode !== "scan";
   els.scan2dFieldGroup.hidden = state.mode !== "scan2d";
+  els.optimizeFieldGroup.hidden = state.mode !== "optimize";
   els.inducedField.hidden = state.mode !== "fba";
-  els.durationField.hidden = state.mode === "fba";
+  els.durationField.hidden = state.mode === "fba" || state.mode === "optimize";
+  // step_mode 只有內部真的會跑 dFBA 引擎的模式才有意義：dFBA 本身、以及
+  // Etot 掃描／2D 掃描（每個網格點內部其實也是各跑一次 dFBA）。
+  els.stepModeField.hidden = !["dfba", "scan", "scan2d"].includes(state.mode);
   els.compareField.hidden = state.mode !== "dfba";
   els.compareClearRow.hidden = state.mode !== "dfba" || state.dfbaHistory.length === 0;
 
-  for (const key of ["fbaResults", "dfbaResults", "scanResults", "scan2dResults"]) {
+  for (const key of ["fbaResults", "dfbaResults", "scanResults", "scan2dResults", "optimizeResults"]) {
     document.getElementById(key).hidden = key !== cfg.resultBlock;
   }
   els.statusHint.textContent = "";
@@ -1564,6 +1767,7 @@ function readCommonParams() {
     dxps_ub: Number(document.getElementById("dxpsUb").value),
     metat_ub: Number(document.getElementById("metatUb").value),
     fpps_ub: Number(document.getElementById("fppsUb").value),
+    step_mode: document.getElementById("stepMode").value,
   };
 }
 
@@ -1575,7 +1779,8 @@ async function runCurrentMode() {
     if (state.mode === "fba") await runFba();
     else if (state.mode === "dfba") await runDfba();
     else if (state.mode === "scan") await runScan();
-    else await runScan2d();
+    else if (state.mode === "scan2d") await runScan2d();
+    else await runOptimize();
     els.statusHint.textContent = t("done");
   } catch (err) {
     els.statusHint.className = "hint hint--error";
@@ -1622,6 +1827,7 @@ function renderFbaAll(data) {
   renderFbaReport(data);
   renderFbaSummary(data);
   renderFbaCharts(data);
+  renderDataTable("fba", data);
 }
 
 function renderFbaEnzymeChart(data) {
@@ -1919,6 +2125,143 @@ function renderDfbaCharts(latestData) {
       yaxis: { ...plotlyLayoutBase().yaxis, title: "mmol/gDW/h" },
     }, { displayModeBar: false, responsive: true });
   }
+
+  renderDfbaT7FluxChart(data);
+  renderDfbaYieldSummary();
+  renderDataTable("dfba", data);
+}
+
+/* 各酵素（DXS/IDI 正反向/GPPS/LS）自己的通量隨時間變化——後端 /api/dfba 的
+   t7_fluxes 早就有算，只是之前沒有畫出來。疊圖比較模式下只畫最新一次執行
+   （疊很多次 run × 5 個酵素會太亂看不清楚），單次模式跟其他圖表行為一致。 */
+function renderDfbaT7FluxChart(data) {
+  const t7 = data.t7_fluxes || {};
+  const seriesDefs = [
+    ["DXS", "t7FluxDXS"],
+    ["IDI_fwd", "t7FluxIDIFwd"],
+    ["IDI_rev", "t7FluxIDIRev"],
+    ["GPPS", "t7FluxGPPS"],
+    ["LS", "t7FluxLS"],
+  ];
+  const traces = seriesDefs
+    .filter(([key]) => t7[key])
+    .map(([key, labelKey], i) => ({
+      x: data.time_h,
+      y: t7[key],
+      name: t(labelKey),
+      line: { color: accentColors()[i % accentColors().length], width: 2 },
+    }));
+  Plotly.newPlot("dfbaT7FluxChart", traces, {
+    ...plotlyLayoutBase(),
+    title: { text: t("t7FluxChartTitle"), font: { size: 13, color: chartTitleColor() } },
+    xaxis: { ...plotlyLayoutBase().xaxis, title: t("timeAxis") },
+    yaxis: { ...plotlyLayoutBase().yaxis, title: "mmol/gDW/h" },
+  }, { displayModeBar: false, responsive: true });
+}
+
+// 限烯烴（C10H16）分子量，換算 mM → g/L 用：g/L = mM * MW(g/mol) / 1000。
+const LIMONENE_MW_G_PER_MOL = 136.24;
+
+/* 「總產量」摘要：因為是批次培養（沒有連續進出料），總產量就是模擬結束時
+   的最終限烯烴濃度。指標卡顯示最新一次執行的終點數字（mM + 換算成 g/L）；
+   長條圖則列出目前疊圖比較裡「每一次執行」的終點濃度，方便一眼比較哪組
+   參數的總產量最高——單次模式下就只有一根柱子。 */
+function renderDfbaYieldSummary() {
+  const history = state.dfbaHistory;
+  if (!history.length) return;
+  const latest = history[history.length - 1];
+  const n = latest.time_h.length;
+  const finalTiterMM = latest.limonene_mM[n - 1];
+  const finalTiterGL = finalTiterMM * LIMONENE_MW_G_PER_MOL / 1000;
+  const finalBiomass = latest.biomass_gDW_L[n - 1];
+  const totalTime = latest.time_h[n - 1];
+
+  document.getElementById("mDfbaFinalTiter").textContent =
+    `${fmt(finalTiterMM, 3)} mM (${fmt(finalTiterGL, 3)} g/L)`;
+  document.getElementById("mDfbaFinalBiomass").textContent = `${fmt(finalBiomass, 3)} gDW/L`;
+  document.getElementById("mDfbaSimTime").textContent = `${fmt(totalTime, 2)} h`;
+
+  const runLabels = history.map((run) => t("compareRunLabel", run.runNo));
+  const finalTiters = history.map((run) => run.limonene_mM[run.limonene_mM.length - 1]);
+  const finalTitersGL = finalTiters.map((v) => v * LIMONENE_MW_G_PER_MOL / 1000);
+
+  Plotly.newPlot("dfbaYieldChart", [{
+    type: "bar",
+    x: runLabels,
+    y: finalTiters,
+    text: finalTitersGL.map((v, i) => `${fmt(finalTiters[i], 2)} mM<br>${fmt(v, 3)} g/L`),
+    textposition: "outside",
+    cliponaxis: false,
+    marker: { color: categoricalColors(runLabels.length) },
+  }], {
+    ...plotlyLayoutBase(),
+    title: { text: t("dfbaYieldChartTitle"), font: { size: 13, color: chartTitleColor() } },
+    margin: { l: 55, r: 20, t: 60, b: 45 },
+    xaxis: { ...plotlyLayoutBase().xaxis, type: "category" },
+    yaxis: { ...plotlyLayoutBase().yaxis, title: t("limoneneAxis") },
+  }, { displayModeBar: false, responsive: true });
+}
+
+/* ================= 原始數據表格 ================= */
+// 各模式的原始數據表格，跟 exportCsv() 用同一批資料，只是畫成可以直接在頁面上看的
+// HTML 表格，不用下載檔案才能看數字。表格本身用 Number.prototype.toFixed 控制位數，
+// 避免長串浮點數尾數洗版。
+function buildTableHtml(headers, rows) {
+  const thead = `<thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>`;
+  const tbody = `<tbody>${rows.map((r) =>
+    `<tr>${r.map((v) => `<td>${v}</td>`).join("")}</tr>`).join("")}</tbody>`;
+  return `<table class="data-table">${thead}${tbody}</table>`;
+}
+
+function renderDataTable(mode, data) {
+  const containerId = {
+    fba: "fbaDataTable", dfba: "dfbaDataTable", scan: "scanDataTable",
+    scan2d: "scan2dDataTable", optimize: "optimizeDataTable",
+  }[mode];
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  let html = "";
+  if (mode === "fba") {
+    const rows = Object.entries(data.enzyme_fluxes || {}).map(([k, v]) => [k, fmt(v, 5)]);
+    rows.push(["mu_max (h⁻¹)", fmt(data.mu_max, 4)]);
+    rows.push(["growth_rate (h⁻¹)", fmt(data.growth_rate, 4)]);
+    rows.push(["limonene_flux (mmol/gDW/h)", fmt(data.limonene_flux, 5)]);
+    const cof = data.cofactors || {};
+    rows.push(["ATP (mmol/gDW/h)", fmt(cof.atp_production_mmol_gDW_h, 4)]);
+    rows.push(["NADPH (mmol/gDW/h)", fmt(cof.nadph_production_mmol_gDW_h, 4)]);
+    html = buildTableHtml([t("rawDataMetricCol"), t("rawDataValueCol")], rows);
+  } else if (mode === "dfba") {
+    const t7 = data.t7_fluxes || {};
+    const headers = ["t (h)", "biomass (gDW/L)", "glycerol (mM)", "limonene (mM)",
+      "μ (h⁻¹)", "lim.flux", "DXS", "IDI_fwd", "IDI_rev", "GPPS", "LS"];
+    const rows = data.time_h.map((tv, i) => [
+      fmt(tv, 2), fmt(data.biomass_gDW_L[i], 4), fmt(data.glycerol_mM[i], 3),
+      fmt(data.limonene_mM[i], 4), fmt(data.growth_rate_h[i], 4), fmt(data.limonene_flux[i], 5),
+      fmt(t7.DXS && t7.DXS[i], 5), fmt(t7.IDI_fwd && t7.IDI_fwd[i], 5),
+      fmt(t7.IDI_rev && t7.IDI_rev[i], 5), fmt(t7.GPPS && t7.GPPS[i], 5), fmt(t7.LS && t7.LS[i], 5),
+    ]);
+    html = buildTableHtml(headers, rows);
+  } else if (mode === "scan") {
+    const headers = ["Etot (µM)", "final limonene (mM)", "max post-IPTG flux (mmol/gDW/h)"];
+    const rows = data.results.map((r) => [fmt(r.etot_uM, 3), fmt(r.final_limonene_mM, 2), fmt(r.max_post_iptg_flux, 2)]);
+    html = buildTableHtml(headers, rows);
+  } else if (mode === "scan2d") {
+    const headers = [`${data.enzyme_y} \\ ${data.enzyme_x}`, ...data.values_x.map((v) => fmt(v, 3))];
+    const rows = data.values_y.map((y, i) => [
+      fmt(y, 3), ...data.final_limonene_mM[i].map((v) => fmt(v, 3)),
+    ]);
+    html = `<p style="padding:8px 12px;margin:0;font-size:11px;color:var(--text-muted);">${t("rawDataScan2dNote")}</p>` +
+      buildTableHtml(headers, rows);
+  } else if (mode === "optimize") {
+    const headers = ["#", "DXS", "IDI", "GPPS", "LS", "limonene_flux (mmol/gDW/h)"];
+    const rows = (data.history || []).map((h, i) => [
+      i + 1, fmt(h.etot.DXS, 3), fmt(h.etot.IDI, 3), fmt(h.etot.GPPS, 3), fmt(h.etot.LS, 3),
+      fmt(h.limonene_flux, 5),
+    ]);
+    html = buildTableHtml(headers, rows);
+  }
+  container.innerHTML = html;
 }
 
 /* ---------------- Etot scan ---------------- */
@@ -1950,18 +2293,26 @@ function renderScanCharts(scanData) {
   const etotVals = scanData.results.map((r) => r.etot_uM);
   const finalLim = scanData.results.map((r) => r.final_limonene_mM);
   const maxFlux = scanData.results.map((r) => r.max_post_iptg_flux);
+  // Y 軸範圍強制從 0 開始，不讓 Plotly 自動縮放到「只框住微小差異」的極窄範圍——
+  // 不然像 DXS/LS 這種其實幾乎沒差的平坦數據，會被誇張放大成看起來劇烈起伏的假象。
+  // Y 軸範圍改成貼著資料本身的最小/最大值留 0.01 的邊界，不再強制從 0 開始——
+  // 這樣資料的實際高低變化看得更清楚，不會因為固定拉到 0 而把曲線壓得很平。
+  const maxFluxRange = [Math.min(...maxFlux) - 0.01, Math.max(...maxFlux) + 0.01];
+  const finalLimRange = [Math.min(...finalLim) - 0.01, Math.max(...finalLim) + 0.01];
   Plotly.newPlot("scanEndpointChart", [
     { x: etotVals, y: maxFlux, name: t("maxFluxLegend"), type: "scatter", mode: "lines+markers",
-      line: { color: accentColors()[0] } },
+      line: { color: accentColors()[0] }, hovertemplate: "%{y:.2f}<extra></extra>" },
     { x: etotVals, y: finalLim, name: t("finalLimLegend"), yaxis: "y2", type: "scatter", mode: "lines+markers",
-      line: { color: accentColors()[1], dash: "dash" } },
+      line: { color: accentColors()[1], dash: "dash" }, hovertemplate: "%{y:.2f}<extra></extra>" },
   ], {
     ...plotlyLayoutBase(),
     title: { text: t("scanEndpointTitle", enzyme), font: { size: 13, color: chartTitleColor() } },
     xaxis: { ...plotlyLayoutBase().xaxis, title: `${enzyme} Etot (µM)`, type: "log" },
-    yaxis: { ...plotlyLayoutBase().yaxis, title: "mmol/gDW/h" },
-    yaxis2: { overlaying: "y", side: "right", showgrid: false, title: "mM" },
+    yaxis: { ...plotlyLayoutBase().yaxis, title: "mmol/gDW/h", range: maxFluxRange, tickformat: ".2f" },
+    yaxis2: { overlaying: "y", side: "right", showgrid: false, title: "mM", range: finalLimRange, tickformat: ".2f" },
   }, { displayModeBar: false, responsive: true });
+
+  renderDataTable("scan", scanData);
 }
 
 /* ---------------- 雙酵素 Etot 2D 掃描 ---------------- */
@@ -2016,9 +2367,80 @@ function renderScan2dCharts(data) {
     xaxis: { ...plotlyLayoutBase().xaxis, title: `${enzymeX} Etot (µM)` },
     yaxis: { ...plotlyLayoutBase().yaxis, title: `${enzymeY} Etot (µM)` },
   }, { displayModeBar: false, responsive: true });
+
+  renderDataTable("scan2d", data);
 }
 
-/* ================= 參數預設集（localStorage） ================= */
+/* ---------------- 自動最佳化 Etot（Nelder-Mead） ---------------- */
+async function runOptimize() {
+  const maxIter = Number(document.getElementById("optimizeMaxIter").value) || 200;
+  const params = readCommonParams();
+  const data = await postJson("/api/optimize-etot", { params, max_iter: maxIter });
+  state.lastResults.optimize = data;
+  renderOptimizeResults(data);
+}
+
+function renderOptimizeResults(data) {
+  document.getElementById("mOptimizeFlux").textContent =
+    `${fmt(data.best_limonene_flux, 5)} mmol/gDW/h`;
+  document.getElementById("mOptimizeEvals").textContent = String(data.n_evaluations);
+  document.getElementById("mOptimizeConverged").textContent =
+    data.converged ? t("optimizeConvergedYes") : t("optimizeConvergedNo");
+
+  // 最佳 Etot 組合：四個酵素各一根柱子，依序上色。
+  const enzymes = ["DXS", "IDI", "GPPS", "LS"];
+  const values = enzymes.map((e) => data.best_etot[e]);
+  Plotly.newPlot("optimizeBestEtotChart", [{
+    type: "bar",
+    x: enzymes,
+    y: values,
+    text: values.map((v) => fmt(v, 3)),
+    textposition: "outside",
+    cliponaxis: false,
+    marker: { color: categoricalColors(enzymes.length) },
+  }], {
+    ...plotlyLayoutBase(),
+    title: { text: t("optimizeBestEtotChartTitle"), font: { size: 13, color: chartTitleColor() } },
+    margin: { l: 55, r: 20, t: 60, b: 45 },
+    xaxis: { ...plotlyLayoutBase().xaxis, type: "category" },
+    yaxis: { ...plotlyLayoutBase().yaxis, title: "Etot (µM)" },
+  }, { displayModeBar: false, responsive: true });
+
+  // 收斂過程：每次評估的限烯烴通量，疊一條「目前為止最佳值」的累積最大線，
+  // 方便看出演算法是不是已經收斂（曲線趨平）還是還在持續進步。
+  const history = data.history || [];
+  const evalIdx = history.map((_, i) => i + 1);
+  const fluxSeries = history.map((h) => h.limonene_flux);
+  let runningBest = -Infinity;
+  const bestSeries = fluxSeries.map((v) => {
+    runningBest = Math.max(runningBest, v);
+    return runningBest;
+  });
+  Plotly.newPlot("optimizeConvergeChart", [
+    { x: evalIdx, y: fluxSeries, name: t("limFluxLegend"), mode: "markers",
+      marker: { color: accentColors()[2], size: 5, opacity: 0.6 } },
+    { x: evalIdx, y: bestSeries, name: t("optimizeBestFluxTrace"),
+      line: { color: accentColors()[0], width: 2.5 } },
+  ], {
+    ...plotlyLayoutBase(),
+    title: { text: t("optimizeConvergeChartTitle"), font: { size: 13, color: chartTitleColor() } },
+    xaxis: { ...plotlyLayoutBase().xaxis, title: "evaluation #" },
+    yaxis: { ...plotlyLayoutBase().yaxis, title: "mmol/gDW/h" },
+  }, { displayModeBar: false, responsive: true });
+
+  renderDataTable("optimize", data);
+}
+
+document.getElementById("optimizeApplyBtn").addEventListener("click", () => {
+  const data = state.lastResults.optimize;
+  if (!data) { flashHint(t("exportNoData"), true); return; }
+  for (const enzyme of ["DXS", "IDI", "GPPS", "LS"]) {
+    document.getElementById(`etot-${enzyme}`).value = fmt(data.best_etot[enzyme], 4);
+  }
+  flashHint(t("optimizeApplied"), false);
+});
+
+
 function getPresetsStore() {
   try {
     return JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY) || "{}");
@@ -2311,6 +2733,13 @@ function exportCsv(mode) {
     csv = "final_limonene_mM\n" + rowsToCsv(headers, finalRows) +
       "\n\nmax_post_iptg_flux\n" + rowsToCsv(headers, fluxRows);
     filename = `scan2d_${data.enzyme_x}_${data.enzyme_y}_result.csv`;
+  } else if (mode === "optimize") {
+    const headers = ["eval", "DXS", "IDI", "GPPS", "LS", "limonene_flux_mmol_gDW_h"];
+    const rows = (data.history || []).map((h, i) => [
+      i + 1, h.etot.DXS, h.etot.IDI, h.etot.GPPS, h.etot.LS, h.limonene_flux,
+    ]);
+    csv = rowsToCsv(headers, rows);
+    filename = "optimize_etot_result.csv";
   } else {
     return;
   }

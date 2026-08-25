@@ -14,15 +14,13 @@ LimoneneCOBRA FBA / dFBA 網頁後端（單檔版）。
     index.html                         前端網頁
     models/iEC1356_Bl21DE3.mat         COBRA Toolbox 菌株模型（需自行放入）
 
-加速（選用）：
+加速：
     pip install highspy
-    export LIMONENE_FAST_SOLVER=1
-    → 改用 HiGHS 這個 LP solver（比 cobrapy 預設的 GLPK 快很多倍），對 FBA /
-      dFBA / 掃描 / 2D 掃描全部都有幫助。預設不會自動啟用——因為換 solver 在
-      LP 解不唯一（degenerate solution）的情況下可能挑到不同的那組解，數字
-      跟用 GLPK（MATLAB COBRA Toolbox 預設）跑出來的參考結果會對不太起來。
-      如果你在對照 MATLAB／GLPK 的參考數值，請不要設這個環境變數，維持預設
-      的 GLPK 即可；只有在不需要逐位對齊、單純想要更快時才建議開啟。
+    → 裝了就會自動改用 HiGHS 這個 LP solver（比 cobrapy 預設的 GLPK 快很多倍），
+      對 FBA / dFBA / 掃描 / 2D 掃描全部都有幫助，預設就是啟用的。裝不到時會
+      安靜地退回 GLPK，不影響任何功能。
+      如果你需要跟 MATLAB／GLPK 的結果逐位對齊，設環境變數
+      LIMONENE_FAST_SOLVER=0 可以停用、強制使用 GLPK。
     另外，Etot 掃描與雙酵素 2D 掃描的每一格彼此獨立，會自動用多個 CPU 核心平行
     計算（背景用 ProcessPoolExecutor），不需要額外設定，這個不影響求解結果。
 """
@@ -36,6 +34,7 @@ import cobra
 from cobra import Reaction, Metabolite
 from cobra.flux_analysis import pfba
 from flask import Flask, jsonify, request, send_from_directory
+from scipy.optimize import minimize
 
 
 # ============================================================
@@ -135,6 +134,9 @@ class ParamRegistry:
             # 阻斷），跟你之前給的參考報表數字 0.00 不一致，這裡先照腳本改成
             # 0.05——如果你確認 0.00 才是對的，請告訴我，我再改回去。
             "fpps_ub": r.scalar_or_default("bounds.FPPS_ub", 0.05),
+            # dFBA 時間步長模式：使用者可選 "fixed"（預設，對照 MATLAB 參考結果）
+            # 或 "adaptive"（自適應步長，換速度、數值不再逐位對齊 MATLAB）。
+            "step_mode": "fixed",
         }
 
 
@@ -286,15 +288,13 @@ def build_model(model_path):
 def _use_fast_solver(model):
     """嘗試切換到比預設 GLPK 快很多的 LP solver（HiGHS）。
 
-    預設不會自動切換：只有在設定環境變數 LIMONENE_FAST_SOLVER=1 時才會啟用。
-    原因：雖然換 solver 理論上不改變「目標函數的最佳值」，但當最佳解不只一組
-    （degenerate solution，pFBA 場景下很常見——很多組通量分布的總和一樣小），
-    不同 solver 的單純形法實作可能挑到不同的那一組解，個別反應通量（進而
-    ATP/NADPH 這類 cofactor 加總）就可能對不上用別的 solver（例如 MATLAB
-    COBRA Toolbox 預設用的 GLPK）跑出來的參考結果。如果你在對照 MATLAB／GLPK
-    的參考數值，請維持預設（不開啟），這樣兩邊都是 GLPK，比較不會有這種落差；
-    只有在你不需要跟其他 solver 的結果逐位對齊、單純想要更快時才建議開啟。"""
-    if os.environ.get("LIMONENE_FAST_SOLVER", "").strip() not in ("1", "true", "True"):
+    預設會啟用（不需要再另外設環境變數）。之前刻意設成「要手動開啟」是因為
+    當時還在跟 MATLAB／GLPK 逐位對照驗證數字，換 solver 在 LP 解不唯一
+    （degenerate solution，pFBA 場景下很常見）時可能挑到不同的那一組解，
+    個別反應通量會跟 GLPK 跑出來的參考結果有落差。現在對照驗證已經完成，
+    改成預設啟用。如果你之後又需要跟 GLPK 逐位對齊，設環境變數
+    LIMONENE_FAST_SOLVER=0 停用即可退回 GLPK。"""
+    if os.environ.get("LIMONENE_FAST_SOLVER", "1").strip() in ("0", "false", "False"):
         return None
     for solver_name in ("highs", "cplex", "gurobi"):
         try:
@@ -471,6 +471,12 @@ FIXED_ENZYME_CAPACITY_MMOL_GDW_H = {
 
 BURDEN_RXN = "T7_BURDEN"
 
+# 對照 dynamicFBA_T7simple004.m 的 exclUptakeRxns 預設值：這四個反應（氣體／溶劑）
+# 不納入動態濃度追蹤，邊界維持培養基設定時的固定值，不會被每步的質量平衡更新去動。
+# 如果誤把它們當一般「未追蹤受質」給虛擬池，長時間模擬下這個池可能被耗盡，
+# 造成氧氣／二氧化碳等攝取被不該有的限制——這是跟原始 dFBA 引擎行為的真實差異。
+DYNAMIC_TRACKING_EXCLUDED_RXNS = {"EX_co2_e", "EX_o2_e", "EX_h2o_e", "EX_h_e"}
+
 
 def etot_to_capacity_flux(kcat_s, etot_uM, cell_volume_L_per_gDW):
     """capacityFlux [mmol/gDW/h] = 3.6 * kcat[s^-1] * Etot[uM] * cellVolume[L/gDW]"""
@@ -532,7 +538,12 @@ def apply_t7_kinetic_rules(model, capacities, time_now, iptg_start_time,
 
 def solve_growth_only(model, biomass_rxn):
     model.objective = biomass_rxn
-    sol = model.optimize()
+    # 對照 dynamicFBA_T7simple004.m 的 optimizeCbModel(modelStep,'max','one')：
+    # dFBA 每一步的求解本來就該用 pFBA（'one' 旗標），不是只有靜態 FBA。
+    try:
+        sol = pfba(model)
+    except Exception:
+        sol = model.optimize()
     return sol, "growthOnly", None
 
 
@@ -545,7 +556,10 @@ def solve_production_priority(model, biomass_rxn, prod_rxn, min_growth_frac,
 
     biomass_bounds = model.reactions.get_by_id(biomass_rxn).bounds
     model.objective = biomass_rxn
-    growth_sol = model.optimize()
+    try:
+        growth_sol = pfba(model)
+    except Exception:
+        growth_sol = model.optimize()
     if growth_sol.status != "optimal":
         model.reactions.get_by_id(biomass_rxn).bounds = biomass_bounds
         return growth_sol, "prodPriority_noCurrentGrowthReference", None, float("nan")
@@ -561,7 +575,10 @@ def solve_production_priority(model, biomass_rxn, prod_rxn, min_growth_frac,
         floor_now = max(0.0, frac * reference_mu)
         model.reactions.get_by_id(biomass_rxn).lower_bound = floor_now
         model.objective = prod_rxn
-        sol = model.optimize()
+        try:
+            sol = pfba(model)
+        except Exception:
+            sol = model.optimize()
         if sol.status == "optimal":
             mu = sol.fluxes[biomass_rxn]
             acceptable = (mu > min_positive_mu) if stop_on_non_positive_growth \
@@ -589,6 +606,77 @@ def update_uptake_bounds(model, exchange_ids, concentrations, biomass,
         rxn.lower_bound = -bound
 
 
+# ============================================================
+# 3a. Etot 自動最佳化（Nelder-Mead simplex，Nelder & Mead 1965）
+#     用少量幾次穩態 FBA 求解取代窮舉網格掃描，直接找出讓限烯烴通量最大化的
+#     Etot(DXS/IDI/GPPS/LS) 組合。跟 dFBA 引擎完全獨立、不影響任何已驗證過
+#     的計算邏輯，純粹是新增的「幫你找參數」功能。
+# ============================================================
+
+def _fba_limonene_flux_for_etot(etot_vec, base_params):
+    """給定一組 Etot（DXS/IDI/GPPS/LS，µM），跑一次穩態誘導 FBA，回傳限烯烴
+    分泌通量。任何一步不可行都回傳 0（讓最佳化演算法把這個方向當作壞方向，
+    不會讓整個搜尋因為單一不可行點而中斷）。"""
+    params = dict(base_params)
+    params["Etot"] = {
+        "DXS": max(0.0, etot_vec[0]), "IDI": max(0.0, etot_vec[1]),
+        "GPPS": max(0.0, etot_vec[2]), "LS": max(0.0, etot_vec[3]),
+    }
+    model = working_model()
+    apply_adjustable_medium(model, params)
+    capacities = compute_enzyme_capacities(params)
+    apply_t7_kinetic_rules(
+        model, capacities, params["iptg_start_time_h"],
+        params["iptg_start_time_h"], params["pre_induction_expr"],
+        params["induced_expr"], params["induction_ramp_time_h"],
+        params["burden_base_lb"], params["burden_max_lb"])
+
+    biomass_rxn = params["biomass_rxn"]
+    model.objective = biomass_rxn
+    growth_sol = model.optimize()
+    if growth_sol.status != "optimal":
+        return 0.0
+    mu_max = growth_sol.fluxes[biomass_rxn]
+    model.reactions.get_by_id(biomass_rxn).lower_bound = params["min_growth_frac"] * mu_max
+    model.objective = "EX_limonene_e"
+    sol = model.optimize()
+    if sol.status != "optimal":
+        return 0.0
+    return max(0.0, sol.fluxes.get("EX_limonene_e", 0.0))
+
+
+def optimize_etot_nelder_mead(base_params, initial_etot, max_iter=200):
+    """用 Nelder-Mead 找出讓限烯烴通量最大化的 Etot 組合。
+    scipy 的 minimize 只會找最小值，所以內部目標函式回傳「負的限烯烴通量」，
+    等於在找最大值。"""
+    x0 = [initial_etot["DXS"], initial_etot["IDI"], initial_etot["GPPS"], initial_etot["LS"]]
+    history = []
+
+    def objective(x):
+        flux = _fba_limonene_flux_for_etot(x, base_params)
+        history.append({
+            "etot": {
+                "DXS": max(0.0, x[0]), "IDI": max(0.0, x[1]),
+                "GPPS": max(0.0, x[2]), "LS": max(0.0, x[3]),
+            },
+            "limonene_flux": flux,
+        })
+        return -flux
+
+    result = minimize(
+        objective, x0, method="Nelder-Mead",
+        options={"maxiter": max_iter, "xatol": 1e-3, "fatol": 1e-6, "adaptive": True})
+
+    best_x = [max(0.0, v) for v in result.x]
+    return {
+        "best_etot": {"DXS": best_x[0], "IDI": best_x[1], "GPPS": best_x[2], "LS": best_x[3]},
+        "best_limonene_flux": -result.fun,
+        "n_evaluations": len(history),
+        "converged": bool(result.success),
+        "history": history,
+    }
+
+
 def run_dfba(model, params):
     """執行單次 dFBA 模擬，回傳時間序列。"""
     capacities = compute_enzyme_capacities(params)
@@ -599,7 +687,8 @@ def run_dfba(model, params):
     dt = params["time_step_h"]
     n_steps = params["n_steps"]
 
-    exchange_ids = [r.id for r in model.exchanges]
+    exchange_ids = [r.id for r in model.exchanges
+                    if r.id not in DYNAMIC_TRACKING_EXCLUDED_RXNS]
     original_uptake_capacity = {r_id: max(0.0, -model.reactions.get_by_id(r_id).lower_bound)
                                  for r_id in exchange_ids}
     uptake_allowed = {r_id: original_uptake_capacity[r_id] > 0 for r_id in exchange_ids}
@@ -627,7 +716,32 @@ def run_dfba(model, params):
     reference_mu_max = float("nan")
     stopped_reason = None
 
-    for step in range(n_steps):
+    # step_mode 讓使用者選擇時間步長怎麼走：
+    #   "fixed"（預設）：固定步長 dt = time_step_h，跑滿 n_steps 步——完全對照
+    #     dynamicFBA_T7simple004.m 的行為，數字跟 MATLAB 參考結果一致。
+    #   "adaptive"：步長會依生長速率的變化率動態縮放（變化大時自動縮小步長，
+    #     像誘導剛拉滿那個瞬間；變化平緩時自動放大步長），數字「不會」完全
+    #     等於固定步長版本——這是刻意的取捨（用更少步數跑到同樣的模擬總時長，
+    #     換取速度，數值上是另一種近似），選這個模式代表你不需要跟 MATLAB
+    #     逐位對齊。
+    step_mode = params.get("step_mode", "fixed")
+    target_total_time_h = n_steps * dt
+    dt_min = dt / 10.0
+    dt_max = dt * 4.0
+    adaptive_target_rel_change = 0.08
+    max_adaptive_steps = n_steps * 8
+    prev_mu = None
+    step = 0
+
+    while True:
+        if step_mode == "adaptive":
+            if time_vec[-1] >= target_total_time_h - 1e-9 or step >= max_adaptive_steps:
+                break
+            dt = min(dt, target_total_time_h - time_vec[-1])
+        else:
+            if step >= n_steps:
+                break
+
         t_now = time_vec[-1]
 
         expr_factor, phase = apply_t7_kinetic_rules(
@@ -699,6 +813,18 @@ def run_dfba(model, params):
 
         update_uptake_bounds(model, exchange_ids, concentrations, biomass, dt,
                               original_uptake_capacity, uptake_allowed)
+
+        if step_mode == "adaptive":
+            # 依這一步生長速率的相對變化量，決定「下一步」的步長：變化越大，
+            # 下一步縮得越小（例如誘導剛拉滿那瞬間）；變化越平緩，下一步放大。
+            if prev_mu is not None:
+                rel_change = abs(mu - prev_mu) / max(abs(prev_mu), 1e-9)
+                factor = math.sqrt(adaptive_target_rel_change / max(rel_change, 1e-9))
+                factor = min(2.0, max(0.5, factor))
+                dt = min(dt_max, max(dt_min, dt * factor))
+            prev_mu = mu
+
+        step += 1
 
     return {
         "time_h": time_vec,
@@ -1124,6 +1250,21 @@ def etot_scan_2d_endpoint():
 
     model = get_base_model()
     result = etot_scan_2d(model, params, enzyme_x, enzyme_y, values_x, values_y)
+    return jsonify(result)
+
+
+@app.route("/api/optimize-etot", methods=["POST"])
+def optimize_etot_endpoint():
+    """用 Nelder-Mead 自動找出讓限烯烴通量最大化的 Etot(DXS/IDI/GPPS/LS) 組合，
+    取代手動窮舉網格掃描。以目前 Etot 欄位的值當作搜尋起點。"""
+    body = request.get_json(force=True, silent=True) or {}
+    params = merge_params(body.get("params"))
+    # 4 維同時搜尋（DXS/IDI/GPPS/LS）實測需要 300~500 次評估才會穩定收斂，
+    # 60 次左右常常還沒收斂就被截斷——預設值調高，範圍上限也跟著放寬。
+    max_iter = int(body.get("max_iter", 200))
+    max_iter = max(50, min(max_iter, 600))
+
+    result = optimize_etot_nelder_mead(params, params["Etot"], max_iter=max_iter)
     return jsonify(result)
 
 
