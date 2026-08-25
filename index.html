@@ -86,6 +86,20 @@ html, body {
   text-transform: uppercase;
 }
 
+.header__title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.header__logo {
+  height: 44px;
+  width: 44px;
+  object-fit: contain;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
 .header__title h1 {
   margin: 6px 0 0;
   font-size: 30px;
@@ -119,6 +133,103 @@ html, body {
   align-items: center;
   gap: 16px;
 }
+
+.header__nav-pills {
+  display: flex;
+  gap: 8px;
+}
+
+.pill-btn {
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 9px 16px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s ease, color .15s ease;
+  white-space: nowrap;
+}
+.pill-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- 相關資訊／關於我們 子頁面 ---------- */
+.info-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 32px 64px;
+}
+
+.info-page__header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 20px;
+  margin-bottom: 28px;
+}
+.info-page__header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  flex: 1 1 auto;
+}
+.info-page__header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.info-block {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 18px;
+}
+.info-block h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.info-block p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text);
+}
+.info-placeholder-hint {
+  color: var(--text-muted) !important;
+  font-size: 12.5px !important;
+  font-style: italic;
+}
+.info-link {
+  display: inline-block;
+  color: var(--steel);
+  font-size: 13px;
+  text-decoration: none;
+}
+.info-link:hover { text-decoration: underline; }
+
+.info-link-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+  transition: border-color .15s ease;
+}
+.info-link-row:hover { border-color: var(--accent); }
+.info-link-row__arrow { color: var(--text-muted); }
+
 
 .lang-toggle {
   display: inline-flex;
@@ -163,6 +274,11 @@ html, body {
   transition: border-color .15s ease, color .15s ease;
 }
 .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.theme-toggle img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
 
 /* ---------- Mode tabs ---------- */
 .mode-tabs {
@@ -461,25 +577,32 @@ html, body {
 
 <div class="console">
 
+  <div id="mainView">
   <header class="console__header">
     <div class="header__title">
-      <span class="header__eyebrow" data-i18n="eyebrow">iEC1356_Bl21DE3 · T7 誘導表現系統</span>
-      <h1>LimoneneCOBRA <span class="header__accent" data-i18n="headerAccent">dFBA 控制台</span></h1>
+      <img class="header__logo" src="/assets/logo.png" alt="Logo" onerror="this.style.display='none'">
+      <div>
+        <span class="header__eyebrow" data-i18n="eyebrow">iEC1356_Bl21DE3 · T7 誘導表現系統</span>
+        <h1>LimoneneCOBRA <span class="header__accent" data-i18n="headerAccent">dFBA 控制台</span></h1>
+      </div>
     </div>
     <div class="header__right">
       <div class="header__status" id="modelStatus">
         <span class="dot dot--pending"></span> <span data-i18n="checking">檢查模型中…</span>
+      </div>
+      <div class="header__nav-pills">
+        <button class="pill-btn" id="navInfoBtn" type="button" data-i18n="navInfo">相關資訊</button>
+        <button class="pill-btn" id="navAboutBtn" type="button" data-i18n="navAbout">關於我們</button>
       </div>
       <div class="lang-toggle" id="langToggle">
         <button class="lang-toggle__btn is-active" data-lang="zh">中</button>
         <button class="lang-toggle__btn" data-lang="en">EN</button>
       </div>
       <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">
-        <span id="themeToggleIcon">&#9788;</span>
+        <img id="themeToggleIcon" src="/assets/sun.svg" alt="" onerror="this.style.display='none'">
       </button>
     </div>
   </header>
-
   <nav class="mode-tabs" id="modeTabs">
     <button class="mode-tab is-active" data-mode="fba">
       <span class="mode-tab__label">FBA</span>
@@ -733,6 +856,100 @@ html, body {
 
     </section>
   </main>
+  </div>
+
+  <!-- ============ 相關資訊 ============ -->
+  <section class="info-page" id="infoPage" hidden>
+    <div class="info-page__header">
+      <button class="pill-btn" id="infoBackBtn" type="button">
+        <span data-i18n="navBack">← 返回</span>
+      </button>
+      <h1 data-i18n="navInfo">相關資訊</h1>
+      <div class="info-page__header-right">
+        <div class="lang-toggle" id="langToggleInfo">
+          <button class="lang-toggle__btn" data-lang="zh">中</button>
+          <button class="lang-toggle__btn" data-lang="en">EN</button>
+        </div>
+        <button class="theme-toggle" id="themeToggleInfo" type="button" aria-label="Toggle theme">
+          <img class="theme-toggle-icon-mirror" src="/assets/sun.svg" alt="" onerror="this.style.display='none'">
+        </button>
+      </div>
+    </div>
+    <div class="info-page__body">
+      <div class="info-block">
+        <h2 data-i18n="info1Title">1. 什麼是基因體尺度代謝模型（GSMM）與通量平衡分析（FBA）</h2>
+        <p data-i18n="info1Body">GSMM 把一個生物已知的所有代謝反應整理成數學模型，FBA 在「質量守恆」與各反應通量上下限的限制下，求解出讓某個目標（例如生長速率、或某個產物的分泌速率）最大化的通量分布。這是本工具背後 FBA／dFBA 模擬的理論基礎。</p>
+      </div>
+      <div class="info-block">
+        <h2 data-i18n="info2Title">2. T7 誘導表現系統與 IPTG 誘導原理</h2>
+        <p data-i18n="info2Body">本專案使用的異源檸檬烯合成路徑（DXS、IDI、GPPS、LS）由 T7 啟動子控制，平常受 lac 阻遏蛋白抑制、幾乎不表現；加入 IPTG 後阻遏蛋白被解除，酵素表現量隨時間逐漸提升（誘導斜坡），直到達到穩定的誘導後表現量。模擬裡的「IPTG 加入時間」與「誘導斜坡時間」對應的就是這個生物學機制。</p>
+      </div>
+      <div class="info-block">
+        <h2 data-i18n="info3Title">3. 檸檬烯生合成路徑</h2>
+        <p data-i18n="info3Body">路徑大致是：MEP 路徑（DXS 等原生/異源酵素）產生異戊烯焦磷酸（IPP）與其異構物 DMAPP → IDI 讓兩者互相轉換 → GPPS 把 IPP/DMAPP 縮合成香葉基焦磷酸（GPP）→ 限烯烴合成酶（LS）把 GPP 轉成檸檬烯後分泌到胞外。</p>
+      </div>
+      <div class="info-block">
+        <h2 data-i18n="info4Title">4. 模型與參數來源</h2>
+        <p data-i18n="info4Body">代謝模型基礎為大腸桿菌基因體尺度模型 iEC1356_Bl21DE3，異源路徑與培養基／誘導參數的設定邏輯整理自團隊內部的 LimoneneCOBRA 系列腳本（MATLAB COBRA Toolbox 版本），這個網頁工具是同一套邏輯的 Python／cobrapy 重新實作版本。</p>
+        <p class="info-placeholder-hint" data-i18n="infoSourcesTodo">（這裡可以放你們實際引用的文獻連結，例如 iEC1356 模型原始論文、T7 誘導動力學參考資料等——把下面的連結網址換成真的即可）</p>
+        <a class="info-link" href="#" target="_blank" rel="noopener" data-i18n="infoLinkPlaceholder">延伸閱讀連結（請替換成實際網址）→</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 關於我們 ============ -->
+  <section class="info-page" id="aboutPage" hidden>
+    <div class="info-page__header">
+      <button class="pill-btn" id="aboutBackBtn" type="button">
+        <span data-i18n="navBack">← 返回</span>
+      </button>
+      <h1 data-i18n="navAbout">關於我們</h1>
+      <div class="info-page__header-right">
+        <div class="lang-toggle" id="langToggleAbout">
+          <button class="lang-toggle__btn" data-lang="zh">中</button>
+          <button class="lang-toggle__btn" data-lang="en">EN</button>
+        </div>
+        <button class="theme-toggle" id="themeToggleAbout" type="button" aria-label="Toggle theme">
+          <img class="theme-toggle-icon-mirror" src="/assets/sun.svg" alt="" onerror="this.style.display='none'">
+        </button>
+      </div>
+    </div>
+    <div class="info-page__body">
+      <div class="info-block">
+        <h2 data-i18n="aboutIntroTitle">簡介</h2>
+        <p data-i18n="aboutIntroBody1">我們是 No Fold，CCU-Taiwan iGEM 團隊，由國立中正大學各學院的學生所組成，涵蓋理學院、工學院、社會科學院、文學院，以及跨領域學士學位學程的同學。</p>
+        <p data-i18n="aboutIntroBody2">我們團隊計畫利用生物合成學的方式，開發可用於驅趕農業害蟲瘤野螟的系統，希望大家了解農藥對世界的危害以及增進大眾對有機稻米的認知。</p>
+      </div>
+      <div class="info-block">
+        <h2 data-i18n="aboutLinksTitle">相關連結</h2>
+        <a class="info-link-row" href="https://github.com/Leilong20060926/CCU-iGEM-software" target="_blank" rel="noopener">
+          <span>GitHub Repository</span><span class="info-link-row__arrow">→</span>
+        </a>
+        <a class="info-link-row" href="https://ccu-igem-software.onrender.com" target="_blank" rel="noopener">
+          <span data-i18n="aboutLiveTool">線上工具</span><span class="info-link-row__arrow">→</span>
+        </a>
+        <a class="info-link-row" href="https://www.instagram.com/ccuigem/" target="_blank" rel="noopener">
+          <span>Instagram</span><span class="info-link-row__arrow">→</span>
+        </a>
+        <a class="info-link-row" href="https://igem.ccu.edu.tw/" target="_blank" rel="noopener">
+          <span data-i18n="aboutSchoolLink">學校官網</span><span class="info-link-row__arrow">→</span>
+        </a>
+        <a class="info-link-row" href="https://www.youtube.com/@ccutaiwanigemteam133/featured" target="_blank" rel="noopener">
+          <span>YouTube</span><span class="info-link-row__arrow">→</span>
+        </a>
+        <a class="info-link-row" href="https://leilong20060926.github.io/CCU-iGEM-game/" target="_blank" rel="noopener">
+          <span data-i18n="aboutGameLink">NoFold 小遊戲</span><span class="info-link-row__arrow">→</span>
+        </a>
+        <a class="info-link-row" href="https://leilong20060926.github.io/CCU-iGEM-model/" target="_blank" rel="noopener">
+          <span data-i18n="aboutPestLink">瘤野螟爆發與防治建議系統</span><span class="info-link-row__arrow">→</span>
+        </a>
+        <a class="info-link-row" href="https://igem.xn--hrr.tw/" target="_blank" rel="noopener">
+          <span data-i18n="aboutMapLink">綠農地圖</span><span class="info-link-row__arrow">→</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
 </div>
 
 <script>
@@ -864,6 +1081,28 @@ const I18N = {
     summaryGrowthPart: (pct) => `目前設定下，菌株仍能維持理論最大生長速率的 ${pct}%。`,
     summaryYieldPart: (y) => `檸檬烯分泌速率約為 ${y} mmol/gDW/h。`,
     summaryInfeasible: "目前設定下求解不可行，請調整培養基或酵素濃度後再試一次。",
+    navInfo: "相關資訊",
+    navAbout: "關於我們",
+    navBack: "← 返回",
+    info1Title: "1. 什麼是基因體尺度代謝模型（GSMM）與通量平衡分析（FBA）",
+    info1Body: "GSMM 把一個生物已知的所有代謝反應整理成數學模型，FBA 在「質量守恆」與各反應通量上下限的限制下，求解出讓某個目標（例如生長速率、或某個產物的分泌速率）最大化的通量分布。這是本工具背後 FBA／dFBA 模擬的理論基礎。",
+    info2Title: "2. T7 誘導表現系統與 IPTG 誘導原理",
+    info2Body: "本專案使用的異源檸檬烯合成路徑（DXS、IDI、GPPS、LS）由 T7 啟動子控制，平常受 lac 阻遏蛋白抑制、幾乎不表現；加入 IPTG 後阻遏蛋白被解除，酵素表現量隨時間逐漸提升（誘導斜坡），直到達到穩定的誘導後表現量。模擬裡的「IPTG 加入時間」與「誘導斜坡時間」對應的就是這個生物學機制。",
+    info3Title: "3. 檸檬烯生合成路徑",
+    info3Body: "路徑大致是：MEP 路徑（DXS 等原生/異源酵素）產生異戊烯焦磷酸（IPP）與其異構物 DMAPP → IDI 讓兩者互相轉換 → GPPS 把 IPP/DMAPP 縮合成香葉基焦磷酸（GPP）→ 限烯烴合成酶（LS）把 GPP 轉成檸檬烯後分泌到胞外。",
+    info4Title: "4. 模型與參數來源",
+    info4Body: "代謝模型基礎為大腸桿菌基因體尺度模型 iEC1356_Bl21DE3，異源路徑與培養基／誘導參數的設定邏輯整理自團隊內部的 LimoneneCOBRA 系列腳本（MATLAB COBRA Toolbox 版本），這個網頁工具是同一套邏輯的 Python／cobrapy 重新實作版本。",
+    infoSourcesTodo: "（這裡可以放你們實際引用的文獻連結，例如 iEC1356 模型原始論文、T7 誘導動力學參考資料等——把下面的連結網址換成真的即可）",
+    infoLinkPlaceholder: "延伸閱讀連結（請替換成實際網址）→",
+    aboutIntroTitle: "簡介",
+    aboutIntroBody1: "我們是 No Fold，CCU-Taiwan iGEM 團隊，由國立中正大學各學院的學生所組成，涵蓋理學院、工學院、社會科學院、文學院，以及跨領域學士學位學程的同學。",
+    aboutIntroBody2: "我們團隊計畫利用生物合成學的方式，開發可用於驅趕農業害蟲瘤野螟的系統，希望大家了解農藥對世界的危害以及增進大眾對有機稻米的認知。",
+    aboutLinksTitle: "相關連結",
+    aboutLiveTool: "線上工具",
+    aboutSchoolLink: "學校官網",
+    aboutGameLink: "NoFold 小遊戲",
+    aboutPestLink: "瘤野螟爆發與防治建議系統",
+    aboutMapLink: "綠農地圖",
   },
   en: {
     pageTitle: "LimoneneCOBRA · dFBA Console",
@@ -989,6 +1228,28 @@ const I18N = {
     summaryGrowthPart: (pct) => `At the current settings, the strain retains ${pct}% of its theoretical maximum growth rate.`,
     summaryYieldPart: (y) => `Limonene secretion rate is about ${y} mmol/gDW/h.`,
     summaryInfeasible: "The problem is infeasible with the current settings — try adjusting the medium or enzyme concentrations.",
+    navInfo: "Related Information",
+    navAbout: "About Us",
+    navBack: "← Back",
+    info1Title: "1. What are genome-scale metabolic models (GSMMs) and flux balance analysis (FBA)",
+    info1Body: "A GSMM organizes all known metabolic reactions of an organism into a mathematical model. FBA solves for the flux distribution that maximizes an objective (e.g. growth rate, or the secretion rate of a product) subject to mass-balance constraints and each reaction's flux bounds. This is the theoretical basis behind the FBA/dFBA simulations in this tool.",
+    info2Title: "2. The T7 induction system and IPTG induction",
+    info2Body: "The heterologous limonene pathway used in this project (DXS, IDI, GPPS, LS) is controlled by a T7 promoter, which is normally repressed by the lac repressor and barely expressed. Adding IPTG relieves the repression, and enzyme expression ramps up over time (the induction ramp) until it reaches a stable post-induction level. The \"IPTG addition time\" and \"induction ramp time\" in the simulation correspond directly to this biological mechanism.",
+    info3Title: "3. The limonene biosynthesis pathway",
+    info3Body: "Roughly: the MEP pathway (DXS and other native/heterologous enzymes) produces isopentenyl pyrophosphate (IPP) and its isomer DMAPP → IDI interconverts the two → GPPS condenses IPP/DMAPP into geranyl pyrophosphate (GPP) → limonene synthase (LS) converts GPP into limonene, which is then secreted.",
+    info4Title: "4. Model and parameter sources",
+    info4Body: "The base metabolic model is the E. coli genome-scale model iEC1356_Bl21DE3. The logic for the heterologous pathway and medium/induction parameters was ported from the team's internal LimoneneCOBRA scripts (MATLAB COBRA Toolbox version); this web tool is a Python/cobrapy reimplementation of that same logic.",
+    infoSourcesTodo: "(You can put your actual reference links here — e.g. the original iEC1356 model paper, T7 induction kinetics references — just replace the placeholder URL below with the real one.)",
+    infoLinkPlaceholder: "Further reading (replace with the real URL) →",
+    aboutIntroTitle: "Introduction",
+    aboutIntroBody1: "We are No Fold, the CCU-Taiwan iGEM team, made up of students from across National Chung Cheng University — the College of Science, College of Engineering, College of Social Sciences, College of Letters, and the interdisciplinary undergraduate program.",
+    aboutIntroBody2: "Our team is using synthetic biology to develop a system for repelling the agricultural pest rice leaf-roller, aiming to raise awareness of the harm pesticides cause and to improve public understanding of organic rice.",
+    aboutLinksTitle: "Related Links",
+    aboutLiveTool: "Live Tool",
+    aboutSchoolLink: "School Website",
+    aboutGameLink: "NoFold Mini-Game",
+    aboutPestLink: "Rice Leaf-roller Outbreak & Control Advisory",
+    aboutMapLink: "Taiwan Organic Agriculture Map",
   },
 };
 
@@ -1006,7 +1267,7 @@ function applyStaticI18n() {
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
-  document.getElementById("langToggle").querySelectorAll(".lang-toggle__btn").forEach((btn) => {
+  document.querySelectorAll(".lang-toggle__btn").forEach((btn) => {
     btn.classList.toggle("is-active", btn.dataset.lang === state.lang);
   });
 }
@@ -1110,6 +1371,7 @@ async function init() {
   applyStaticI18n();
   bindLangToggle();
   bindThemeToggle();
+  bindInfoPages();
   bindModeTabs();
   bindPresetControls();
   bindCompareControls();
@@ -1130,7 +1392,7 @@ async function init() {
 }
 
 function bindLangToggle() {
-  document.getElementById("langToggle").querySelectorAll(".lang-toggle__btn").forEach((btn) => {
+  document.querySelectorAll(".lang-toggle__btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       if (btn.dataset.lang === state.lang) return;
       state.lang = btn.dataset.lang;
@@ -1156,18 +1418,50 @@ function initTheme() {
 }
 
 function bindThemeToggle() {
-  document.getElementById("themeToggle").addEventListener("click", () => {
-    const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
-    document.documentElement.dataset.theme = next;
-    updateThemeIcon(next);
-    try { localStorage.setItem(THEME_STORAGE_KEY, next); } catch (err) { /* 忽略寫入失敗 */ }
-    rerenderAllResults();
+  document.querySelectorAll(".theme-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+      document.documentElement.dataset.theme = next;
+      updateThemeIcon(next);
+      try { localStorage.setItem(THEME_STORAGE_KEY, next); } catch (err) { /* 忽略寫入失敗 */ }
+      rerenderAllResults();
+    });
   });
 }
 
 function updateThemeIcon(theme) {
-  // 深色主題顯示太陽（可切換成日間），淺色主題顯示月亮（可切換成夜間）。
-  document.getElementById("themeToggleIcon").innerHTML = theme === "light" ? "&#9789;" : "&#9788;";
+  // 深色主題顯示太陽圖示（可切換成日間），淺色主題顯示月亮圖示（可切換成夜間）。
+  // 圖示檔案放在 assets/sun.svg、assets/moon.svg（跟 main.py 同層的 assets/ 資料夾）。
+  // 主頁跟兩個子頁面（相關資訊／關於我們）各自有一顆切換鈕，一起更新。
+  const src = theme === "light" ? "/assets/moon.svg" : "/assets/sun.svg";
+  document.getElementById("themeToggleIcon").src = src;
+  document.querySelectorAll(".theme-toggle-icon-mirror").forEach((img) => { img.src = src; });
+}
+
+/* ================= 頁面導覽（主控台／相關資訊／關於我們） ================= */
+function bindInfoPages() {
+  const mainView = document.getElementById("mainView");
+  const infoPage = document.getElementById("infoPage");
+  const aboutPage = document.getElementById("aboutPage");
+
+  const showPage = (page) => {
+    mainView.hidden = true;
+    infoPage.hidden = true;
+    aboutPage.hidden = true;
+    page.hidden = false;
+    window.scrollTo(0, 0);
+  };
+  const showMain = () => {
+    infoPage.hidden = true;
+    aboutPage.hidden = true;
+    mainView.hidden = false;
+    window.scrollTo(0, 0);
+  };
+
+  document.getElementById("navInfoBtn").addEventListener("click", () => showPage(infoPage));
+  document.getElementById("navAboutBtn").addEventListener("click", () => showPage(aboutPage));
+  document.getElementById("infoBackBtn").addEventListener("click", showMain);
+  document.getElementById("aboutBackBtn").addEventListener("click", showMain);
 }
 
 /* 圖表、白話總結、技術報表都是用 t() / cssVar() 動態產生文字與顏色，不是 data-i18n

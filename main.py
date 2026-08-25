@@ -940,8 +940,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.environ.get("LIMONENE_MODEL_PATH", _default_model_path(BASE_DIR))
 PARAM_CSV = os.environ.get(
     "LIMONENE_PARAM_CSV", os.path.join(BASE_DIR, "LIM009_params.csv"))
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 
-app = Flask(__name__)
+# static_folder 只指到 assets/ 這個子資料夾（logo、日夜切換圖示這類靜態圖檔），
+# 不是整個 BASE_DIR——避免把 main.py／LIM009_params.csv／models/ 這些不該公開
+# 的檔案又意外對外開放。放圖檔時記得放進 main.py 同層的 assets/ 資料夾。
+app = Flask(__name__, static_folder=ASSETS_DIR, static_url_path="/assets")
 
 _registry = None
 _base_model = None
