@@ -1,0 +1,6 @@
+flask>=2.3
+cobra>=0.29
+gunicorn>=21.2
+
+# 選用：換更快的 LP solver（強烈建議裝，FBA/dFBA/掃描全部都會變快）
+highspy>=1.5
