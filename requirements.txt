@@ -2,5 +2,8 @@ flask>=2.3
 cobra>=0.29
 gunicorn>=21.2
 
-# 選用：換更快的 LP solver（強烈建議裝，FBA/dFBA/掃描全部都會變快）
-highspy>=1.5
+# 選用：換更快的 LP solver。裝了之後還要另外設定環境變數
+# LIMONENE_FAST_SOLVER=1 才會真的啟用（預設維持 GLPK，跟 MATLAB COBRA
+# Toolbox 一致，避免跟參考數值對不起來）。不需要跟 MATLAB 逐位對齊、
+# 單純想要更快時才建議裝＋開啟。
+# highspy>=1.5

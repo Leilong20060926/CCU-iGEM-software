@@ -14,12 +14,17 @@ LimoneneCOBRA FBA / dFBA 網頁後端（單檔版）。
     index.html                         前端網頁
     models/iEC1356_Bl21DE3.mat         COBRA Toolbox 菌株模型（需自行放入）
 
-加速（選用，強烈建議）：
+加速（選用）：
     pip install highspy
-    → 會自動改用 HiGHS 這個 LP solver（比 cobrapy 預設的 GLPK 快很多倍），
-      對 FBA / dFBA / 掃描 / 2D 掃描全部都有幫助，沒裝也能正常運作只是比較慢。
+    export LIMONENE_FAST_SOLVER=1
+    → 改用 HiGHS 這個 LP solver（比 cobrapy 預設的 GLPK 快很多倍），對 FBA /
+      dFBA / 掃描 / 2D 掃描全部都有幫助。預設不會自動啟用——因為換 solver 在
+      LP 解不唯一（degenerate solution）的情況下可能挑到不同的那組解，數字
+      跟用 GLPK（MATLAB COBRA Toolbox 預設）跑出來的參考結果會對不太起來。
+      如果你在對照 MATLAB／GLPK 的參考數值，請不要設這個環境變數，維持預設
+      的 GLPK 即可；只有在不需要逐位對齊、單純想要更快時才建議開啟。
     另外，Etot 掃描與雙酵素 2D 掃描的每一格彼此獨立，會自動用多個 CPU 核心平行
-    計算（背景用 ProcessPoolExecutor），不需要額外設定。
+    計算（背景用 ProcessPoolExecutor），不需要額外設定，這個不影響求解結果。
 """
 
 import concurrent.futures
@@ -29,6 +34,7 @@ import os
 
 import cobra
 from cobra import Reaction, Metabolite
+from cobra.flux_analysis import pfba
 from flask import Flask, jsonify, request, send_from_directory
 
 
@@ -125,7 +131,10 @@ class ParamRegistry:
             "atpm_lb": r.scalar_or_default("sim.atpmLB", 4.0),
             "dxps_ub": r.scalar_or_default("bounds.DXPS_ub", 30.0),
             "metat_ub": r.scalar_or_default("bounds.METAT_ub", 0.10),
-            "fpps_ub": r.scalar_or_default("bounds.FPPS_ub", 0.0),
+            # 注意：LimoneneCOBRA001.m 原始腳本設的是 0.05（knock-down 但不完全
+            # 阻斷），跟你之前給的參考報表數字 0.00 不一致，這裡先照腳本改成
+            # 0.05——如果你確認 0.00 才是對的，請告訴我，我再改回去。
+            "fpps_ub": r.scalar_or_default("bounds.FPPS_ub", 0.05),
         }
 
 
@@ -154,8 +163,11 @@ TRACE_ION_RXNS = [
     "EX_cobalt2_e", "EX_mobd_e", "EX_ni2_e", "EX_sel_e", "EX_tungs_e",
 ]
 
+# 對照 LimoneneCOBRA001.m 的 inorganic_rxns：多了 EX_nh4_e（銨根，主要氮源之一）。
+# 原本這裡漏掉這一項，銨根會被前面「全部先歸零」那段鎖死在 0，等於完全沒有
+# 這個氮源可用——這是造成生長速率跟參考版本兜不起來的原因之一。
 RICH_MEDIUM_OPEN = [
-    "EX_pi_e", "EX_so4_e", "EX_mg2_e", "EX_k_e", "EX_na1_e",
+    "EX_pi_e", "EX_nh4_e", "EX_so4_e", "EX_mg2_e", "EX_k_e", "EX_na1_e",
     "EX_ca2_e", "EX_cl_e", "EX_h2o_e", "EX_h_e", "EX_co2_e",
 ]
 
@@ -167,10 +179,45 @@ AA_EXCHANGES = [
     "EX_thr__L_e", "EX_trp__L_e", "EX_tyr__L_e", "EX_val__L_e",
 ]
 
+# 對照 LimoneneCOBRA001.m 的 aa_ratios：BioShop TB（Tryptone 12g/L + Yeast Extract
+# 24g/L）的胺基酸不是每種都給一樣的攝取上限，而是按這個比例分配一個「總量」。
+# 順序必須跟 AA_EXCHANGES 一一對應（Ala, Arg, Asn, Asp, Cys, Gln, Glu, Gly, His,
+# Ile, Leu, Lys, Met, Phe, Pro, Ser, Thr, Trp, Tyr, Val）。
+_AA_RATIOS_RAW = [
+    0.03, 0.03, 0.04, 0.07,
+    0.005, 0.05, 0.15, 0.03,
+    0.02, 0.05, 0.10, 0.08,
+    0.025, 0.05, 0.10, 0.06,
+    0.04, 0.01, 0.03, 0.07,
+]
+_AA_RATIOS_SUM = sum(_AA_RATIOS_RAW)
+AA_RATIOS = dict(zip(AA_EXCHANGES, (r / _AA_RATIOS_SUM for r in _AA_RATIOS_RAW)))
+
 MEDIUM_NAME = "BioShop Terrific Broth (Tryptone 12g/L, Yeast Extract 24g/L)"
 
-# 原生代謝路徑邊界可調的反應 ID：MEP 路徑（DXPS）、甲硫胺酸代謝（METAT）、
-# 法尼基焦磷酸合成酶（FPPS，作為 knock-down 目標）。若模型中沒有這些 ID 會被安全略過。
+# 對照 LimoneneCOBRA001.m：腳本明確寫死要用哪一個 biomass 反應，不是自動偵測。
+# iEC1356 這類模型常常同時有好幾個 BIOMASS_ 開頭的變體（例如 _WT_ / _core_），
+# 如果自動偵測（挑第一個 objective_coefficient != 0 的反應）跟腳本指定的不是
+# 同一個，算出來的最大生長速率可以差到快 2 倍。優先用這個環境變數／固定 ID，
+# 模型裡真的找不到才 fallback 回自動偵測。
+PREFERRED_BIOMASS_RXN = os.environ.get(
+    "LIMONENE_BIOMASS_RXN", "BIOMASS_Ec_iJO1366_WT_53p95M")
+
+
+def detect_biomass_rxn(model):
+    """優先使用 PREFERRED_BIOMASS_RXN（對齊 LimoneneCOBRA001.m 寫死的目標反應），
+    模型裡沒有這個 ID 才 fallback 回『目標函數係數不為 0 的第一個反應』。"""
+    if PREFERRED_BIOMASS_RXN in model.reactions:
+        return PREFERRED_BIOMASS_RXN
+    biomass_rxns = [r.id for r in model.reactions if r.objective_coefficient != 0]
+    return biomass_rxns[0] if biomass_rxns else None
+
+
+# 原生代謝路徑邊界可調的反應 ID。MEP_PATHWAY_RXNS 對照 LimoneneCOBRA001.m 的
+# mep_rxns：原本我們只有 DXPS 一個反應吃到「MEP 路徑上限」這個參數，實際上
+# MEPCT / MECDPS / IPDPI 這三個反應也要套用同一個上限值，只加 DXPS 會讓 MEP
+# 路徑後段沒有跟著放寬，通量被卡住。
+MEP_PATHWAY_RXNS = ("DXPS", "MEPCT", "MECDPS", "IPDPI")
 NATIVE_PATHWAY_BOUNDS = ("DXPS", "METAT", "FPPS")
 
 
@@ -237,10 +284,18 @@ def build_model(model_path):
 
 
 def _use_fast_solver(model):
-    """嘗試切換到比預設 GLPK 快很多的 LP solver（HiGHS）。dFBA 每個時間點都要重新
-    求解一次 LP，換一個快的 solver 對所有模式（FBA/dFBA/掃描/2D 掃描）都有幫助，
-    且不會改變求解結果，只是求解速度不同。裝不到 highspy 或 cobrapy 版本不支援時，
-    安靜地維持原本的 solver，不影響任何功能。"""
+    """嘗試切換到比預設 GLPK 快很多的 LP solver（HiGHS）。
+
+    預設不會自動切換：只有在設定環境變數 LIMONENE_FAST_SOLVER=1 時才會啟用。
+    原因：雖然換 solver 理論上不改變「目標函數的最佳值」，但當最佳解不只一組
+    （degenerate solution，pFBA 場景下很常見——很多組通量分布的總和一樣小），
+    不同 solver 的單純形法實作可能挑到不同的那一組解，個別反應通量（進而
+    ATP/NADPH 這類 cofactor 加總）就可能對不上用別的 solver（例如 MATLAB
+    COBRA Toolbox 預設用的 GLPK）跑出來的參考結果。如果你在對照 MATLAB／GLPK
+    的參考數值，請維持預設（不開啟），這樣兩邊都是 GLPK，比較不會有這種落差；
+    只有在你不需要跟其他 solver 的結果逐位對齊、單純想要更快時才建議開啟。"""
+    if os.environ.get("LIMONENE_FAST_SOLVER", "").strip() not in ("1", "true", "True"):
+        return None
     for solver_name in ("highs", "cplex", "gurobi"):
         try:
             model.solver = solver_name
@@ -275,19 +330,44 @@ def apply_medium009(model, defaults):
     model.reactions.EX_o2_e.lower_bound = -abs(defaults["maxUptake.EX_o2_e"])
     model.reactions.EX_o2_e.upper_bound = 1000
 
-    rich_aa_uptake = defaults["sim.richAminoAcidMaxUptake"]
-    for rxn_id in AA_EXCHANGES:
-        if rxn_id in model.reactions:
-            model.reactions.get_by_id(rxn_id).lower_bound = -abs(rich_aa_uptake)
+    apply_amino_acid_ratios(model, defaults["sim.richAminoAcidMaxUptake"])
+
+    # 對照 LimoneneCOBRA001.m 的「micro-allowance」：所有其餘還鎖在下限 0 的
+    # 交換反應（沒被上面任何一組清單明確開放），除了葡萄糖跟限烯烴分泌以外，
+    # 統一給一個極小的攝取下限 -0.01，避免某些沒被明確列出的微量代謝物
+    # 造成 biomass 反應的前驅物缺口，使模型不可行或生長速率被異常壓低。
+    for rxn in model.exchanges:
+        if (rxn.lower_bound == 0
+                and rxn.id not in ("EX_glc__D_e", "EX_limonene_e")):
+            rxn.lower_bound = -0.01
 
     return model
+
+
+def apply_amino_acid_ratios(model, total_aa_uptake):
+    """對照 LimoneneCOBRA001.m 的 BioShop TB 胺基酸比例限制：不是每種胺基酸都給
+    同一個攝取上限，而是把 total_aa_uptake（mmol/gDW/h，代表 Tryptone/Yeast
+    Extract 提供的有機氮源總量）按 AA_RATIOS 的比例分配到 20 種胺基酸交換反應。"""
+    total = abs(total_aa_uptake)
+    for rxn_id, ratio in AA_RATIOS.items():
+        if rxn_id in model.reactions:
+            model.reactions.get_by_id(rxn_id).lower_bound = -total * ratio
+
+
+def apply_mep_pathway_bound(model, ub):
+    """對照 LimoneneCOBRA001.m 的 mep_rxns：DXPS/MEPCT/MECDPS/IPDPI 這四個反應
+    共用同一個 MEP 路徑上限，只放寬 DXPS 一個會讓路徑後段卡住。"""
+    for rxn_id in MEP_PATHWAY_RXNS:
+        if rxn_id in model.reactions:
+            model.reactions.get_by_id(rxn_id).upper_bound = ub
 
 
 def apply_adjustable_medium(model, params):
     """套用可由前端調整的培養基攝取限制與原生路徑邊界（每次請求時套用在傳入的
     working model / cobra context 上，不會影響共用的 base model 快取）。
-    對應可調參數：甘油/氧氣攝取上限、豐富培養基胺基酸攝取上限、ATPM 維持能量下限、
-    以及 DXPS / METAT / FPPS 三個原生反應的上限（後三者若模型中不存在會安全略過）。"""
+    對應可調參數：甘油/氧氣攝取上限、豐富培養基胺基酸攝取總量、ATPM 維持能量
+    下限，以及 MEP 路徑（DXPS/MEPCT/MECDPS/IPDPI）／METAT／FPPS 的上限
+    （模型中不存在的反應會安全略過）。"""
     if "EX_glyc_e" in model.reactions:
         model.reactions.EX_glyc_e.lower_bound = -abs(params["maxUptake.EX_glyc_e"])
         model.reactions.EX_glyc_e.upper_bound = 1000
@@ -295,15 +375,11 @@ def apply_adjustable_medium(model, params):
         model.reactions.EX_o2_e.lower_bound = -abs(params["maxUptake.EX_o2_e"])
         model.reactions.EX_o2_e.upper_bound = 1000
 
-    rich_aa_uptake = params["sim.richAminoAcidMaxUptake"]
-    for rxn_id in AA_EXCHANGES:
-        if rxn_id in model.reactions:
-            model.reactions.get_by_id(rxn_id).lower_bound = -abs(rich_aa_uptake)
+    apply_amino_acid_ratios(model, params["sim.richAminoAcidMaxUptake"])
 
     if "ATPM" in model.reactions:
         model.reactions.ATPM.lower_bound = params["atpm_lb"]
-    if "DXPS" in model.reactions:
-        model.reactions.DXPS.upper_bound = params["dxps_ub"]
+    apply_mep_pathway_bound(model, params["dxps_ub"])
     if "METAT" in model.reactions:
         model.reactions.METAT.upper_bound = params["metat_ub"]
     if "FPPS" in model.reactions:
@@ -331,7 +407,11 @@ def metabolite_gross_production_rate(model, solution, met_id):
 
 def build_medium_pathway_report(model, capacities):
     """組出培養基與路徑邊界報告用的資料（供前端渲染成文字報表）。
-    找不到的反應回傳 None，前端會顯示為 N/A，不會因模型缺少該反應而出錯。"""
+    找不到的反應回傳 None，前端會顯示為 N/A，不會因模型缺少該反應而出錯。
+    GPPS/LIMS_MS_het 這兩個直接讀模型上「套用完誘導規則之後」的實際上限
+    （而不是套用前的 kcat×Etot 理論容量），這樣報表數字才會跟真正拿去解 LP
+    的邊界一致——如果只讀理論容量，遇到 GPPS_FIXED_CAPACITY 這種固定值覆蓋
+    的情況，報表會跟實際生效的上限對不起來。"""
     def bounds_of(rxn_id):
         if rxn_id in model.reactions:
             r = model.reactions.get_by_id(rxn_id)
@@ -354,8 +434,8 @@ def build_medium_pathway_report(model, capacities):
         "dxps_ub": ub_of("DXPS"),
         "metat_ub": ub_of("METAT"),
         "fpps_ub": ub_of("FPPS"),
-        "gpps_ub": capacities.get("GPPS"),
-        "lims_ub": capacities.get("LS"),
+        "gpps_ub": ub_of("GPPS_S80F_het") if "GPPS_S80F_het" in model.reactions else capacities.get("GPPS"),
+        "lims_ub": ub_of("LIMS_MS_het") if "LIMS_MS_het" in model.reactions else capacities.get("LS"),
     }
 
 
@@ -380,6 +460,15 @@ CAPACITY_ENZYME_FOR_RXN = {
     "LIMS_MS_het": "LS",
 }
 
+# GPPS/LIMS_MS_het 改用固定的酵素容量上限（mmol/gDW/h），不再用 kcat×Etot
+# 動態計算——對齊使用者提供的參考模型（GPPS/LIMS_MS_het Upper Bound = 20.00）。
+# 誘導比例（expr_factor）依然套用，只是「誘導完全開啟時的上限」固定在這裡，
+# 不受 Etot(GPPS) / Etot(LS) 這兩個輸入欄位影響。DXS/IDI 維持原本 kcat×Etot 邏輯。
+FIXED_ENZYME_CAPACITY_MMOL_GDW_H = {
+    "GPPS": 20.0,
+    "LS": 20.0,
+}
+
 BURDEN_RXN = "T7_BURDEN"
 
 
@@ -387,6 +476,22 @@ def etot_to_capacity_flux(kcat_s, etot_uM, cell_volume_L_per_gDW):
     """capacityFlux [mmol/gDW/h] = 3.6 * kcat[s^-1] * Etot[uM] * cellVolume[L/gDW]"""
     vmax_mM_h = 3.6 * kcat_s * etot_uM
     return vmax_mM_h * cell_volume_L_per_gDW
+
+
+def compute_enzyme_capacities(params):
+    """算出四個 T7 酵素的容量上限（mmol/gDW/h，尚未乘上誘導比例）。
+    GPPS/LS 直接套用 FIXED_ENZYME_CAPACITY_MMOL_GDW_H 的固定值，不用 kcat×Etot；
+    這裡統一處理，確保 API 回傳的 capacities_mmol_gDW_h 跟報表、跟實際套用到
+    模型上的上限三處數字一致，不會各說各話。"""
+    capacities = {}
+    for enzyme in ("DXS", "IDI", "GPPS", "LS"):
+        if enzyme in FIXED_ENZYME_CAPACITY_MMOL_GDW_H:
+            capacities[enzyme] = FIXED_ENZYME_CAPACITY_MMOL_GDW_H[enzyme]
+        else:
+            capacities[enzyme] = etot_to_capacity_flux(
+                params["kcat"][enzyme], params["Etot"][enzyme],
+                params["cell_volume_L_per_gDW"])
+    return capacities
 
 
 def apply_t7_kinetic_rules(model, capacities, time_now, iptg_start_time,
@@ -409,7 +514,10 @@ def apply_t7_kinetic_rules(model, capacities, time_now, iptg_start_time,
         if rxn_id not in model.reactions:
             continue
         rxn = model.reactions.get_by_id(rxn_id)
-        capacity = max(0, capacities.get(enzyme, 0))
+        if enzyme in FIXED_ENZYME_CAPACITY_MMOL_GDW_H:
+            capacity = FIXED_ENZYME_CAPACITY_MMOL_GDW_H[enzyme]
+        else:
+            capacity = max(0, capacities.get(enzyme, 0))
         rxn.lower_bound = 0
         rxn.upper_bound = capacity * expr_factor
 
@@ -483,11 +591,7 @@ def update_uptake_bounds(model, exchange_ids, concentrations, biomass,
 
 def run_dfba(model, params):
     """執行單次 dFBA 模擬，回傳時間序列。"""
-    capacities = {
-        enzyme: etot_to_capacity_flux(params["kcat"][enzyme], params["Etot"][enzyme],
-                                       params["cell_volume_L_per_gDW"])
-        for enzyme in ("DXS", "IDI", "GPPS", "LS")
-    }
+    capacities = compute_enzyme_capacities(params)
 
     biomass_rxn = params["biomass_rxn"]
     prod_rxn = params.get("prod_rxn", "EX_limonene_e")
@@ -610,6 +714,105 @@ def run_dfba(model, params):
     }
 
 
+# ============================================================
+# 3b. FSEOF — Flux Scanning based on Enforced Objective Flux
+#     （Choi et al. 2010, Biotechnol Bioeng；Park et al. 2012）
+#     公開發表的過量表現／下調基因標的搜尋演算法。做法：
+#     逐步拉高目標反應（例如限烯烴分泌）的強制通量下限，每一步都重新最大化
+#     生長速率、記錄全模型的通量分布；隨著強制通量一路拉高，通量「持續同向
+#     變化」的反應就是候選標的：持續上升 → 過量表現候選，持續下降 → 下調候選。
+# ============================================================
+
+def fseof_scan(model, biomass_rxn, target_rxn, n_steps=10, enforce_frac=0.9):
+    """執行 FSEOF 掃描，回傳每一步強制通量下的全模型通量分布，供後續分類。"""
+    with model:
+        model.objective = biomass_rxn
+        growth_sol = model.optimize()
+        if growth_sol.status != "optimal":
+            raise ValueError("生長最佳化不可行，無法執行 FSEOF")
+        mu_max = growth_sol.fluxes[biomass_rxn]
+        v_start = max(0.0, growth_sol.fluxes.get(target_rxn, 0.0))
+
+    with model:
+        # 保留一點點生長下限，避免掃到「完全不長、只拚產物」的退化解。
+        model.reactions.get_by_id(biomass_rxn).lower_bound = 0.1 * mu_max
+        model.objective = target_rxn
+        target_sol = model.optimize()
+        if target_sol.status != "optimal":
+            raise ValueError("目標反應最佳化不可行，無法執行 FSEOF")
+        v_theoretical_max = target_sol.fluxes[target_rxn]
+
+    v_end = enforce_frac * v_theoretical_max
+    if v_end <= v_start or n_steps < 2:
+        raise ValueError("目標反應的可強制拉高空間太小，無法進行 FSEOF 掃描"
+                          "（請確認目前參數下這個反應本來就有機會再提高）")
+
+    enforced_values = [
+        v_start + (v_end - v_start) * i / (n_steps - 1) for i in range(n_steps)
+    ]
+
+    flux_matrix = {}
+    for level in enforced_values:
+        with model:
+            model.reactions.get_by_id(target_rxn).lower_bound = level
+            model.objective = biomass_rxn
+            sol = model.optimize()
+            if sol.status != "optimal":
+                for rxn in model.reactions:
+                    flux_matrix.setdefault(rxn.id, []).append(None)
+                continue
+            for rxn in model.reactions:
+                flux_matrix.setdefault(rxn.id, []).append(float(sol.fluxes.get(rxn.id, 0.0)))
+
+    return {
+        "enforced_values": enforced_values,
+        "v_start": v_start,
+        "v_theoretical_max": v_theoretical_max,
+        "flux_matrix": flux_matrix,
+    }
+
+
+def classify_fseof_targets(fseof_result, biomass_rxn, target_rxn, min_flux_magnitude=1e-6):
+    """依 FSEOF 掃描結果分類每個反應：'up'（過量表現候選）或 'down'（下調候選）。
+    判斷方式：看逐步之間的通量變化是不是幾乎都同一個方向（預設要求至少 80% 的
+    步驟同向），並用「趨勢一致程度」與「首尾通量變化量」排序。排除目標反應本身、
+    biomass 反應，以及全程通量幾乎都是 0 的反應（沒有實質意義的雜訊）。"""
+    flux_matrix = fseof_result["flux_matrix"]
+    results = []
+    for rxn_id, fluxes in flux_matrix.items():
+        if rxn_id in (biomass_rxn, target_rxn):
+            continue
+        clean = [f for f in fluxes if f is not None]
+        if len(clean) < 2:
+            continue
+        if max(abs(f) for f in clean) < min_flux_magnitude:
+            continue
+
+        diffs = [clean[i + 1] - clean[i] for i in range(len(clean) - 1)]
+        n_up = sum(1 for d in diffs if d > 1e-9)
+        n_down = sum(1 for d in diffs if d < -1e-9)
+        n_total = len(diffs)
+        if n_total == 0:
+            continue
+
+        consistency = max(n_up, n_down) / n_total
+        if consistency < 0.8:
+            continue
+
+        direction = "up" if n_up >= n_down else "down"
+        results.append({
+            "reaction": rxn_id,
+            "direction": direction,
+            "consistency": consistency,
+            "delta_flux": clean[-1] - clean[0],
+            "start_flux": clean[0],
+            "end_flux": clean[-1],
+        })
+
+    results.sort(key=lambda r: (-r["consistency"], -abs(r["delta_flux"])))
+    return results
+
+
 def etot_scan(model, base_params, enzyme, scan_values_uM):
     """對單一酵素做 one-at-a-time Etot 掃描，其餘酵素固定在基準值。
     每個掃描值彼此獨立（互不影響），交給 run_params_grid 平行計算。"""
@@ -671,8 +874,7 @@ def _init_pool_worker(model_path, medium_defaults):
     global _worker_model
     model = build_model(model_path)
     model = apply_medium009(model, medium_defaults)
-    biomass_rxns = [r.id for r in model.reactions if r.objective_coefficient != 0]
-    model._biomass_rxn = biomass_rxns[0] if biomass_rxns else None
+    model._biomass_rxn = detect_biomass_rxn(model)
     _worker_model = model
 
 
@@ -739,7 +941,7 @@ MODEL_PATH = os.environ.get("LIMONENE_MODEL_PATH", _default_model_path(BASE_DIR)
 PARAM_CSV = os.environ.get(
     "LIMONENE_PARAM_CSV", os.path.join(BASE_DIR, "LIM009_params.csv"))
 
-app = Flask(__name__, static_folder=BASE_DIR, static_url_path="")
+app = Flask(__name__)
 
 _registry = None
 _base_model = None
@@ -762,8 +964,7 @@ def get_base_model():
                 "或設定 LIMONENE_MODEL_PATH 環境變數指到正確路徑。")
         model = build_model(MODEL_PATH)
         model = apply_medium009(model, get_registry().to_dfba_defaults())
-        biomass_rxns = [r.id for r in model.reactions if r.objective_coefficient != 0]
-        model._biomass_rxn = biomass_rxns[0] if biomass_rxns else None
+        model._biomass_rxn = detect_biomass_rxn(model)
         _base_model = model
     return _base_model
 
@@ -818,11 +1019,7 @@ def fba():
 
     model = working_model()
     apply_adjustable_medium(model, params)
-    capacities = {
-        enzyme: params["kcat"][enzyme] * params["Etot"][enzyme] * 3.6
-                * params["cell_volume_L_per_gDW"]
-        for enzyme in ("DXS", "IDI", "GPPS", "LS")
-    }
+    capacities = compute_enzyme_capacities(params)
     time_now = params["iptg_start_time_h"] if induced else 0
     apply_t7_kinetic_rules(
         model, capacities, time_now,
@@ -840,7 +1037,17 @@ def fba():
     mu_max = growth_sol.fluxes[biomass_rxn]
     model.reactions.get_by_id(biomass_rxn).lower_bound = params["min_growth_frac"] * mu_max
     model.objective = "EX_limonene_e"
-    prod_sol = model.optimize()
+    # 對照 LimoneneCOBRA001.m 的 optimizeCbModel(model,'max','one')：'one' 代表
+    # 在所有跟最佳解一樣好的解裡（FBA 常見退化解），挑「通量總和（L1 範數）最小」
+    # 的那一組——這正是 pFBA 在做的事。單純 model.optimize() 沒有這個篩選規則，
+    # solver 撿到哪組算哪組，會導致目標值（限烯烴產量）一樣，但個別反應通量
+    # （進而 ATP/NADPH 這類 cofactor 加總）跟參考結果對不起來。改用 pFBA 對齊。
+    try:
+        prod_sol = pfba(model)
+    except Exception:
+        # pFBA 在極少數邊界情況下可能不可行（例如目標通量本身就是 0），
+        # 退回普通 FBA，不讓整個請求失敗。
+        prod_sol = model.optimize()
 
     atp_rate = None
     nadph_rate = None

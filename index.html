@@ -825,7 +825,7 @@ const I18N = {
     mediumTitle: "培養基與路徑邊界（可調）",
     glycerolUptakeLabel: "甘油攝取上限 (mmol/gDW/h)",
     oxygenUptakeLabel: "氧氣攝取上限 (mmol/gDW/h)",
-    aaUptakeLabel: "豐富培養基胺基酸攝取上限 (mmol/gDW/h)",
+    aaUptakeLabel: "胺基酸總攝取量 (mmol/gDW/h，依比例分配到 20 種胺基酸)",
     atpmLbLabel: "ATPM 維持能量下限 (mmol/gDW/h)",
     dxpsUbLabel: "DXPS 上限（MEP 路徑）",
     metatUbLabel: "METAT 上限",
@@ -950,7 +950,7 @@ const I18N = {
     mediumTitle: "Medium & Pathway Bounds (adjustable)",
     glycerolUptakeLabel: "Glycerol uptake limit (mmol/gDW/h)",
     oxygenUptakeLabel: "Oxygen uptake limit (mmol/gDW/h)",
-    aaUptakeLabel: "Rich-medium amino acid uptake limit (mmol/gDW/h)",
+    aaUptakeLabel: "Total amino acid uptake (mmol/gDW/h, split by ratio across 20 amino acids)",
     atpmLbLabel: "ATPM maintenance energy lower bound (mmol/gDW/h)",
     dxpsUbLabel: "DXPS upper bound (MEP pathway)",
     metatUbLabel: "METAT upper bound",
@@ -1361,14 +1361,24 @@ function renderFbaCharts(data) {
   const cof = data.cofactors || {};
 
   // 生長速率量表：指針＝實際生產階段生長速率，紅線＝理論最大生長速率。
-  const gaugeMax = Math.max((data.mu_max || 0) * 1.15, 0.01);
+  const muMax = data.mu_max || 0;
+  const gaugeMax = Math.max(muMax * 1.15, 0.01);
   Plotly.newPlot("fbaGrowthChart", [{
     type: "indicator",
     mode: "gauge+number",
     value: data.growth_rate ?? 0,
     number: { suffix: " /h", valueformat: ".3f", font: { color: chartTitleColor(), size: 24 } },
     gauge: {
-      axis: { range: [0, gaugeMax], tickcolor: cssVar("--text-muted"), tickfont: { color: cssVar("--text-muted"), size: 10 } },
+      axis: {
+        range: [0, gaugeMax],
+        tickcolor: cssVar("--text-muted"),
+        tickfont: { color: cssVar("--text-muted"), size: 10 },
+        // 明確在「理論最大生長速率」那個確切數值上放一個刻度，這樣紅線
+        // 旁邊就有數字可以核對，不用只憑目測猜有沒有對齊。
+        tickmode: "array",
+        tickvals: [0, muMax / 2, muMax],
+        ticktext: ["0", fmt(muMax / 2, 2), fmt(muMax, 3)],
+      },
       bar: { color: accentColors()[0] },
       bgcolor: "transparent",
       borderwidth: 1,
@@ -1376,7 +1386,7 @@ function renderFbaCharts(data) {
       threshold: {
         line: { color: accentColors()[3], width: 3 },
         thickness: 0.85,
-        value: data.mu_max ?? 0,
+        value: muMax,
       },
     },
   }], {
