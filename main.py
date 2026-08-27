@@ -27,6 +27,7 @@ LimoneneCOBRA FBA / dFBA 網頁後端（單檔版）。
 
 import concurrent.futures
 import csv
+import itertools
 import math
 import os
 
@@ -35,6 +36,7 @@ from cobra import Reaction, Metabolite
 from cobra.flux_analysis import pfba
 from flask import Flask, jsonify, request, send_from_directory
 from scipy.optimize import minimize
+from scipy.stats import qmc
 
 
 # ============================================================
@@ -460,14 +462,17 @@ CAPACITY_ENZYME_FOR_RXN = {
     "LIMS_MS_het": "LS",
 }
 
-# GPPS/LIMS_MS_het 改用固定的酵素容量上限（mmol/gDW/h），不再用 kcat×Etot
-# 動態計算——對齊使用者提供的參考模型（GPPS/LIMS_MS_het Upper Bound = 20.00）。
-# 誘導比例（expr_factor）依然套用，只是「誘導完全開啟時的上限」固定在這裡，
-# 不受 Etot(GPPS) / Etot(LS) 這兩個輸入欄位影響。DXS/IDI 維持原本 kcat×Etot 邏輯。
-FIXED_ENZYME_CAPACITY_MMOL_GDW_H = {
-    "GPPS": 20.0,
-    "LS": 20.0,
-}
+# kcat×Etot 容量公式適用於全部四個 T7 酵素（DXS/IDI/GPPS/LS），跟
+# LimoneneCOBRA008_Read_V9_capacity_trace_scan.m 裡的 kcatEtotToFluxV9() 完全
+# 一致：capacityFlux = 3.6 * kcat[s^-1] * Etot[uM] * cellVolume[L/gDW]。
+#
+# 之前這裡誤把 GPPS/LS 的容量寫死成固定的 20.0 mmol/gDW/h（不隨 Etot 輸入變化），
+# 原因是誤讀了某一份「單一 Etot 基準值」下跑出來的參考報表數字（GPPS/LIMS_MS_het
+# Upper Bound = 20.00），以為那是設計上的固定上限——但那其實只是「在某一組
+# 基準 Etot 值下算出來的結果」，不是常數。這個誤判造成 GPPS／LS 的 Etot 掃描
+# 永遠是平的（不管掃描值怎麼變，容量都鎖死在 20），跟參考圖表（V9 Etot
+# one-at-a-time capacity scan）呈現數個數量級變化的 LS 曲線完全對不起來。
+# 已經拿掉這個特例，四個酵素現在統一都用 kcat×Etot 計算。
 
 BURDEN_RXN = "T7_BURDEN"
 
@@ -485,19 +490,14 @@ def etot_to_capacity_flux(kcat_s, etot_uM, cell_volume_L_per_gDW):
 
 
 def compute_enzyme_capacities(params):
-    """算出四個 T7 酵素的容量上限（mmol/gDW/h，尚未乘上誘導比例）。
-    GPPS/LS 直接套用 FIXED_ENZYME_CAPACITY_MMOL_GDW_H 的固定值，不用 kcat×Etot；
-    這裡統一處理，確保 API 回傳的 capacities_mmol_gDW_h 跟報表、跟實際套用到
-    模型上的上限三處數字一致，不會各說各話。"""
-    capacities = {}
-    for enzyme in ("DXS", "IDI", "GPPS", "LS"):
-        if enzyme in FIXED_ENZYME_CAPACITY_MMOL_GDW_H:
-            capacities[enzyme] = FIXED_ENZYME_CAPACITY_MMOL_GDW_H[enzyme]
-        else:
-            capacities[enzyme] = etot_to_capacity_flux(
-                params["kcat"][enzyme], params["Etot"][enzyme],
-                params["cell_volume_L_per_gDW"])
-    return capacities
+    """算出四個 T7 酵素的容量上限（mmol/gDW/h，尚未乘上誘導比例），
+    統一用 kcat×Etot 公式，DXS/IDI/GPPS/LS 四個酵素邏輯一致。"""
+    return {
+        enzyme: etot_to_capacity_flux(
+            params["kcat"][enzyme], params["Etot"][enzyme],
+            params["cell_volume_L_per_gDW"])
+        for enzyme in ("DXS", "IDI", "GPPS", "LS")
+    }
 
 
 def apply_t7_kinetic_rules(model, capacities, time_now, iptg_start_time,
@@ -520,10 +520,7 @@ def apply_t7_kinetic_rules(model, capacities, time_now, iptg_start_time,
         if rxn_id not in model.reactions:
             continue
         rxn = model.reactions.get_by_id(rxn_id)
-        if enzyme in FIXED_ENZYME_CAPACITY_MMOL_GDW_H:
-            capacity = FIXED_ENZYME_CAPACITY_MMOL_GDW_H[enzyme]
-        else:
-            capacity = max(0, capacities.get(enzyme, 0))
+        capacity = max(0, capacities.get(enzyme, 0))
         rxn.lower_bound = 0
         rxn.upper_bound = capacity * expr_factor
 
@@ -941,7 +938,13 @@ def classify_fseof_targets(fseof_result, biomass_rxn, target_rxn, min_flux_magni
 
 def etot_scan(model, base_params, enzyme, scan_values_uM):
     """對單一酵素做 one-at-a-time Etot 掃描，其餘酵素固定在基準值。
-    每個掃描值彼此獨立（互不影響），交給 run_params_grid 平行計算。"""
+    每個掃描值彼此獨立（互不影響），交給 run_params_grid 平行計算。
+
+    除了原本的 final_limonene_mM／max_post_iptg_flux，這裡額外從每組結果的
+    完整 dFBA 時間序列（trace）算出三個對照 V9 OAT capacity scan 診斷圖的
+    指標（誘導後平均通量、最大體積生產速率、掃描酵素自己的尖峰容量利用率），
+    「誘導後」統一定義成 time_h >= iptg_start_time_h（跟其他地方 is_induced
+    的判斷方式一致）。"""
     params_list = []
     for value in scan_values_uM:
         p = dict(base_params)
@@ -950,7 +953,56 @@ def etot_scan(model, base_params, enzyme, scan_values_uM):
         params_list.append(p)
 
     raw_results = run_params_grid(model, base_params, params_list)
-    return [{"etot_uM": value, **r} for value, r in zip(scan_values_uM, raw_results)]
+
+    baseline_etot = base_params["Etot"].get(enzyme, 0.0)
+    results = []
+    for value, r, p in zip(scan_values_uM, raw_results, params_list):
+        trace = r["trace"]
+        iptg_t = p["iptg_start_time_h"]
+        post_idx = [i for i, tv in enumerate(trace["time_h"]) if tv >= iptg_t]
+
+        flux_series = trace["limonene_flux"]
+        biomass_series = trace["biomass_gDW_L"]
+        post_fluxes = [flux_series[i] for i in post_idx if flux_series[i] is not None]
+        mean_post_flux = (sum(post_fluxes) / len(post_fluxes)) if post_fluxes else 0.0
+
+        # 體積生產速率（mM/h）= 比生產力（mmol/gDW/h） × 生物量（gDW/L），
+        # 換算後單位是 mmol/L/h = mM/h，反映「整個培養液」實際累積的速度，
+        # 不是每單位生物量的速度。
+        vol_rates = [
+            flux_series[i] * biomass_series[i]
+            for i in post_idx if flux_series[i] is not None
+        ]
+        max_vol_rate = max(vol_rates) if vol_rates else 0.0
+
+        capacity = trace.get("capacities_mmol_gDW_h", {}).get(enzyme, 0.0)
+        t7 = trace.get("t7_fluxes", {})
+        if enzyme == "IDI":
+            # IDI 是可逆反應拆成兩個方向各自獨立的上限，兩邊都可能扛到通量，
+            # 取兩者裡比較大的當作這個酵素當下實際被用到多少。
+            fwd = t7.get("IDI_fwd", [])
+            rev = t7.get("IDI_rev", [])
+            enzyme_flux_series = [
+                max(abs(fwd[i] or 0), abs(rev[i] or 0))
+                for i in post_idx if i < len(fwd) and i < len(rev)
+            ]
+        else:
+            series = t7.get(enzyme, [])
+            enzyme_flux_series = [abs(series[i] or 0) for i in post_idx if i < len(series)]
+        peak_utilization = (max(enzyme_flux_series) / capacity) \
+            if enzyme_flux_series and capacity > 0 else 0.0
+
+        results.append({
+            "etot_uM": value,
+            "etot_factor": (value / baseline_etot) if baseline_etot else None,
+            "trace": trace,
+            "final_limonene_mM": r["final_limonene_mM"],
+            "max_post_iptg_flux": r["max_post_iptg_flux"],
+            "mean_post_induction_flux_mmol_gDW_h": mean_post_flux,
+            "max_volumetric_rate_mM_h": max_vol_rate,
+            "peak_capacity_utilization": peak_utilization,
+        })
+    return results
 
 
 def etot_scan_2d(model, base_params, enzyme_x, enzyme_y, values_x, values_y):
@@ -983,6 +1035,98 @@ def etot_scan_2d(model, base_params, enzyme_x, enzyme_y, values_x, values_y):
         "final_limonene_mM": final_grid,
         "max_post_iptg_flux": flux_grid,
     }
+
+
+def etot_scan_multi(model, base_params, enzymes, values_list):
+    """對 2~4 個酵素同時做交叉掃描（取代原本固定兩個酵素的 2D 掃描）。
+    回傳巢狀陣列，維度順序跟 enzymes 一致：final_limonene_mM[i0][i1]...[iN]，
+    其中 i0 對應 values_list[0] 的索引，以此類推。每個網格點彼此獨立，
+    交給 run_params_grid 平行計算——4 個酵素、每個 5 個值就是 5^4=625 個網格點，
+    格點數越多越慢，前端／endpoint 會擋掉太誇張的組合數。"""
+    grid_points = list(itertools.product(*values_list))
+    params_list = []
+    for point in grid_points:
+        p = dict(base_params)
+        p["Etot"] = dict(base_params["Etot"])
+        for enzyme, value in zip(enzymes, point):
+            p["Etot"][enzyme] = value
+        params_list.append(p)
+
+    raw_results = run_params_grid(model, base_params, params_list)
+    final_flat = [r["final_limonene_mM"] for r in raw_results]
+    flux_flat = [r["max_post_iptg_flux"] for r in raw_results]
+
+    shape = [len(v) for v in values_list]
+
+    def build_nested(flat, shape_remaining):
+        if len(shape_remaining) == 1:
+            return list(flat)
+        size = shape_remaining[0]
+        step = len(flat) // size
+        return [build_nested(flat[i * step:(i + 1) * step], shape_remaining[1:])
+                for i in range(size)]
+
+    return {
+        "enzymes": enzymes,
+        "values_list": values_list,
+        "final_limonene_mM": build_nested(final_flat, shape),
+        "max_post_iptg_flux": build_nested(flux_flat, shape),
+    }
+
+
+# ============================================================
+# 3c. 取樣式多酵素掃描（LHS / Sobol）
+#     跟窮舉網格（etot_scan_multi）不同：不是把每個酵素的候選值全部排列組合，
+#     而是在整個「範圍空間」裡取一組數量固定、分布均勻的樣本點，格點數越多
+#     優勢越明顯——4 個酵素想窮舉到有意義的解析度動輒要跑幾百到上千個網格點，
+#     取樣法可以用少得多的點數（例如 50~100 個）就掌握大致的趨勢分布。
+#     兩個方法都是統計學界有明確論文背書的標準做法，不是我們自己發明的：
+#       LHS  : McKay, Conover & Beckman (1979), Technometrics 21(2), 239-245
+#       Sobol: Sobol' (1967), USSR Comput. Math. Math. Phys. 7(4), 86-112
+#     兩者都直接用 scipy.stats.qmc 內建實作，不用另外寫演算法本體。
+# ============================================================
+
+def generate_qmc_samples(method, bounds, n_samples, seed=42):
+    """method: "lhs" 或 "sobol"。bounds: [(low, high), ...]，每個酵素一組上下限。
+    回傳 n_samples 組取樣點，每組是長度 = len(bounds) 的浮點數 list。
+    seed 固定是為了同一組設定重跑會拿到同一組取樣點，方便重現／除錯；
+    不是為了任何安全性目的。"""
+    d = len(bounds)
+    if method == "lhs":
+        sampler = qmc.LatinHypercube(d=d, seed=seed)
+    elif method == "sobol":
+        sampler = qmc.Sobol(d=d, seed=seed)
+    else:
+        raise ValueError(f"未知的取樣方法: {method}（必須是 lhs 或 sobol）")
+
+    unit_samples = sampler.random(n=n_samples)
+    lows = [b[0] for b in bounds]
+    highs = [b[1] for b in bounds]
+    scaled = qmc.scale(unit_samples, lows, highs)
+    return scaled.tolist()
+
+
+def etot_scan_sampled(model, base_params, enzymes, points):
+    """points: 每個元素是長度 = len(enzymes) 的一組 Etot 值（來自 LHS／Sobol 取樣，
+    不是規則網格，所以沒辦法 reshape 成矩陣，回傳攤平的列表，每筆記錄自己的
+    Etot 組合＋兩個結果值。"""
+    params_list = []
+    for point in points:
+        p = dict(base_params)
+        p["Etot"] = dict(base_params["Etot"])
+        for enzyme, value in zip(enzymes, point):
+            p["Etot"][enzyme] = value
+        params_list.append(p)
+
+    raw_results = run_params_grid(model, base_params, params_list)
+    return [
+        {
+            "etot": dict(zip(enzymes, point)),
+            "final_limonene_mM": r["final_limonene_mM"],
+            "max_post_iptg_flux": r["max_post_iptg_flux"],
+        }
+        for point, r in zip(points, raw_results)
+    ]
 
 
 # ---- 平行運算基礎設施：Etot 掃描／2D 掃描的每一格都是獨立的 dFBA 模擬，---
@@ -1234,7 +1378,9 @@ def etot_scan_endpoint():
 
 @app.route("/api/etot-scan-2d", methods=["POST"])
 def etot_scan_2d_endpoint():
-    """對兩個酵素做交叉（雙因子）Etot 掃描，回傳網格結果。"""
+    """對兩個酵素做交叉（雙因子）Etot 掃描，回傳網格結果。
+    保留這個 endpoint 是為了不動到舊的呼叫方式；新的多酵素掃描前端一律改打
+    /api/etot-scan-multi。"""
     body = request.get_json(force=True, silent=True) or {}
     enzyme_x = body.get("enzyme_x", "LS")
     enzyme_y = body.get("enzyme_y", "DXS")
@@ -1251,6 +1397,78 @@ def etot_scan_2d_endpoint():
     model = get_base_model()
     result = etot_scan_2d(model, params, enzyme_x, enzyme_y, values_x, values_y)
     return jsonify(result)
+
+
+@app.route("/api/etot-scan-multi", methods=["POST"])
+def etot_scan_multi_endpoint():
+    """對 2~4 個酵素同時做交叉掃描（取代雙酵素 2D 掃描的通用版）。
+    body: { enzymes: ["DXS","GPPS",...] (2~4個), values_list: [[...],[...],...],
+            params: {...} }"""
+    body = request.get_json(force=True, silent=True) or {}
+    enzymes = body.get("enzymes") or []
+    values_list = body.get("values_list") or []
+    valid_enzymes = ("DXS", "IDI", "GPPS", "LS")
+
+    if not (2 <= len(enzymes) <= 4):
+        return jsonify({"error": "enzymes 數量必須是 2 到 4 個"}), 400
+    if len(enzymes) != len(set(enzymes)):
+        return jsonify({"error": "enzymes 不可重複選同一個酵素"}), 400
+    if any(e not in valid_enzymes for e in enzymes):
+        return jsonify({"error": "enzymes 必須是 DXS、IDI、GPPS 或 LS 其中之一"}), 400
+    if len(values_list) != len(enzymes):
+        return jsonify({"error": "values_list 的數量必須跟 enzymes 一致"}), 400
+
+    params = merge_params(body.get("params"))
+    resolved_values = []
+    for enzyme, values in zip(enzymes, values_list):
+        resolved_values.append(values or get_registry().scan_values(enzyme))
+
+    total_points = 1
+    for v in resolved_values:
+        total_points *= max(1, len(v))
+    if total_points > 2000:
+        return jsonify({
+            "error": f"總格點數 {total_points} 太多（上限 2000），"
+                     "請減少酵素數量或每個酵素的數值個數"}), 400
+
+    model = get_base_model()
+    result = etot_scan_multi(model, params, enzymes, resolved_values)
+    return jsonify(result)
+
+
+@app.route("/api/etot-scan-sampled", methods=["POST"])
+def etot_scan_sampled_endpoint():
+    """用 LHS 或 Sobol 取樣掃描 2~4 個酵素，取代窮舉網格——格點數要很多才有意義
+    的解析度時（尤其 3、4 個酵素），用固定數量的取樣點掌握大致趨勢會快很多。
+    body: { enzymes: [...] (2~4個), bounds: [[low,high],...], method: "lhs"|"sobol",
+            n_samples: 50, params: {...} }"""
+    body = request.get_json(force=True, silent=True) or {}
+    enzymes = body.get("enzymes") or []
+    bounds = body.get("bounds") or []
+    method = body.get("method", "lhs")
+    n_samples = int(body.get("n_samples", 50))
+    valid_enzymes = ("DXS", "IDI", "GPPS", "LS")
+
+    if not (2 <= len(enzymes) <= 4):
+        return jsonify({"error": "enzymes 數量必須是 2 到 4 個"}), 400
+    if len(enzymes) != len(set(enzymes)):
+        return jsonify({"error": "enzymes 不可重複選同一個酵素"}), 400
+    if any(e not in valid_enzymes for e in enzymes):
+        return jsonify({"error": "enzymes 必須是 DXS、IDI、GPPS 或 LS 其中之一"}), 400
+    if len(bounds) != len(enzymes):
+        return jsonify({"error": "bounds 的數量必須跟 enzymes 一致"}), 400
+    if any(len(b) != 2 or b[1] <= b[0] for b in bounds):
+        return jsonify({"error": "每個酵素的 bounds 必須是 [下限, 上限] 且上限要大於下限"}), 400
+    if method not in ("lhs", "sobol"):
+        return jsonify({"error": "method 必須是 lhs 或 sobol"}), 400
+    n_samples = max(5, min(n_samples, 500))
+
+    params = merge_params(body.get("params"))
+    points = generate_qmc_samples(method, bounds, n_samples)
+
+    model = get_base_model()
+    results = etot_scan_sampled(model, params, enzymes, points)
+    return jsonify({"enzymes": enzymes, "bounds": bounds, "method": method, "results": results})
 
 
 @app.route("/api/optimize-etot", methods=["POST"])

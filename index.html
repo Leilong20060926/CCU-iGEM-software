@@ -424,7 +424,8 @@ html, body {
 }
 .btn-sm:hover { border-color: var(--accent); color: var(--text); }
 .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-sm--accent { border-color: var(--accent); color: var(--accent); }
+.btn-sm--accent { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.btn-sm--accent:hover { background: var(--accent); color: var(--bg-panel, #1b1204); }
 
 .preset-row {
   display: flex;
@@ -650,16 +651,12 @@ html, body {
       <span class="mode-tab__desc" data-i18n="modeDfbaDesc">誘導後動態時間序列</span>
     </button>
     <button class="mode-tab" data-mode="scan">
-      <span class="mode-tab__label" data-i18n="modeScanLabel">Etot 掃描</span>
-      <span class="mode-tab__desc" data-i18n="modeScanDesc">單酵素 OAT 廣域掃描</span>
+      <span class="mode-tab__label" data-i18n="modeScanLabel">Etot 分析</span>
+      <span class="mode-tab__desc" data-i18n="modeScanDesc">單酵素掃描／自動最佳化</span>
     </button>
     <button class="mode-tab" data-mode="scan2d">
-      <span class="mode-tab__label" data-i18n="modeScan2dLabel">雙酵素掃描</span>
-      <span class="mode-tab__desc" data-i18n="modeScan2dDesc">雙酵素交叉掃描 (2D)</span>
-    </button>
-    <button class="mode-tab" data-mode="optimize">
-      <span class="mode-tab__label" data-i18n="modeOptimizeLabel">自動最佳化</span>
-      <span class="mode-tab__desc" data-i18n="modeOptimizeDesc">Nelder-Mead 找最佳 Etot</span>
+      <span class="mode-tab__label" data-i18n="modeScan2dLabel">多酵素掃描</span>
+      <span class="mode-tab__desc" data-i18n="modeScan2dDesc">2~4 酵素交叉掃描</span>
     </button>
   </nav>
 
@@ -742,22 +739,60 @@ html, body {
       <div class="field-group" id="scanFieldGroup" hidden>
         <h2 class="field-group__title" data-i18n="scanTitle">掃描設定</h2>
         <div class="field">
-          <label for="scanEnzyme" data-i18n="scanEnzymeLabel">掃描酵素</label>
-          <select id="scanEnzyme">
-            <option value="DXS">DXS</option>
-            <option value="IDI">IDI</option>
-            <option value="GPPS">GPPS</option>
-            <option value="LS" selected>LS</option>
+          <label for="scanSubMode" data-i18n="scanSubModeLabel">分析方式</label>
+          <select id="scanSubMode">
+            <option value="manual" data-i18n="scanSubModeManual">手動掃描（指定範圍）</option>
+            <option value="optimize" data-i18n="scanSubModeOptimize">自動最佳化（Nelder-Mead）</option>
           </select>
         </div>
-        <div class="field">
-          <label for="scanValues" data-i18n="scanValuesLabel">倍率／濃度序列 (µM，以逗號分隔)</label>
-          <input type="text" id="scanValues" placeholder="0.03, 0.3, 3, 30, 300">
+        <div id="scanManualFields">
+          <div class="field">
+            <label for="scanEnzyme" data-i18n="scanEnzymeLabel">掃描酵素</label>
+            <select id="scanEnzyme">
+              <option value="DXS">DXS</option>
+              <option value="IDI">IDI</option>
+              <option value="GPPS">GPPS</option>
+              <option value="LS" selected>LS</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="scanValues" data-i18n="scanValuesLabel">倍率／濃度序列 (µM，以逗號分隔)</label>
+            <input type="text" id="scanValues" placeholder="0.03, 0.3, 3, 30, 300">
+            <p class="hint" data-i18n="scanLogHint">結果圖表的 X 軸會用對數座標顯示，數值差距很大時比較容易一次看清楚。</p>
+          </div>
+        </div>
+        <div id="scanOptimizeFields" hidden>
+          <div class="field">
+            <label for="optimizeMaxIter" data-i18n="optimizeMaxIterLabel">最大迭代次數</label>
+            <input type="number" id="optimizeMaxIter" step="10" min="50" max="600" value="200">
+          </div>
+          <p class="hint" data-i18n="optimizeHint">從目前 Etot 欄位的數值開始搜尋，用穩態 FBA（非 dFBA）當目標函數，找出讓限烯烴通量最大化的 Etot(DXS/IDI/GPPS/LS) 組合。次數越多越準，但也越慢。</p>
         </div>
       </div>
 
       <div class="field-group" id="scan2dFieldGroup" hidden>
-        <h2 class="field-group__title" data-i18n="scan2dTitle">雙酵素掃描設定</h2>
+        <h2 class="field-group__title" data-i18n="scan2dTitle">多酵素掃描設定</h2>
+        <div class="field">
+          <label for="scanStrategy" data-i18n="scanStrategyLabel">掃描策略</label>
+          <select id="scanStrategy">
+            <option value="grid" data-i18n="scanStrategyGrid">窮舉網格</option>
+            <option value="lhs" data-i18n="scanStrategyLhs">LHS 取樣（Latin Hypercube）</option>
+            <option value="sobol" data-i18n="scanStrategySobol">Sobol 序列（低差異準隨機）</option>
+          </select>
+        </div>
+        <div class="field" id="scanNSamplesField" hidden>
+          <label for="scanNSamples" data-i18n="scanNSamplesLabel">取樣點數</label>
+          <input type="number" id="scanNSamples" step="5" min="5" max="500" value="50">
+        </div>
+        <p class="hint" id="scanStrategyHint" data-i18n="scanStrategyGridHint">用你填的每個酵素候選值做完整交叉組合，格點數 = 各酵素候選值個數相乘。</p>
+        <div class="field">
+          <label for="scanMultiCount" data-i18n="scanMultiCountLabel">掃描酵素數量</label>
+          <select id="scanMultiCount">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
         <div class="field">
           <label for="scanEnzymeX" data-i18n="scanEnzymeXLabel">X 軸酵素</label>
           <select id="scanEnzymeX">
@@ -768,7 +803,7 @@ html, body {
           </select>
         </div>
         <div class="field">
-          <label for="scanValuesX" data-i18n="scanValuesXLabel">X 軸濃度序列 (µM，以逗號分隔)</label>
+          <label for="scanValuesX" id="scanValuesXLabelEl" data-i18n="scanValuesXLabel">X 軸濃度序列 (µM，以逗號分隔)</label>
           <input type="text" id="scanValuesX" placeholder="0.03, 0.3, 3, 30, 300">
         </div>
         <div class="field">
@@ -781,18 +816,36 @@ html, body {
           </select>
         </div>
         <div class="field">
-          <label for="scanValuesY" data-i18n="scanValuesYLabel">Y 軸濃度序列 (µM，以逗號分隔)</label>
+          <label for="scanValuesY" id="scanValuesYLabelEl" data-i18n="scanValuesYLabel">Y 軸濃度序列 (µM，以逗號分隔)</label>
           <input type="text" id="scanValuesY" placeholder="0.03, 0.3, 3, 30, 300">
         </div>
-      </div>
-
-      <div class="field-group" id="optimizeFieldGroup" hidden>
-        <h2 class="field-group__title" data-i18n="optimizeTitle">自動最佳化設定</h2>
-        <div class="field">
-          <label for="optimizeMaxIter" data-i18n="optimizeMaxIterLabel">最大迭代次數</label>
-          <input type="number" id="optimizeMaxIter" step="10" min="50" max="600" value="200">
+        <div class="field" id="scanEnzymeZField" hidden>
+          <label for="scanEnzymeZ" data-i18n="scanEnzymeZLabel">第 3 個酵素</label>
+          <select id="scanEnzymeZ">
+            <option value="DXS">DXS</option>
+            <option value="IDI" selected>IDI</option>
+            <option value="GPPS">GPPS</option>
+            <option value="LS">LS</option>
+          </select>
         </div>
-        <p class="hint" data-i18n="optimizeHint">從目前 Etot 欄位的數值開始搜尋，用穩態 FBA（非 dFBA）當目標函數，找出讓限烯烴通量最大化的 Etot(DXS/IDI/GPPS/LS) 組合。次數越多越準，但也越慢。</p>
+        <div class="field" id="scanValuesZField" hidden>
+          <label for="scanValuesZ" id="scanValuesZLabelEl" data-i18n="scanValuesZLabel">第 3 個酵素濃度序列 (µM，以逗號分隔)</label>
+          <input type="text" id="scanValuesZ" placeholder="0.03, 0.3, 3, 30, 300">
+        </div>
+        <div class="field" id="scanEnzymeWField" hidden>
+          <label for="scanEnzymeW" data-i18n="scanEnzymeWLabel">第 4 個酵素</label>
+          <select id="scanEnzymeW">
+            <option value="DXS">DXS</option>
+            <option value="IDI">IDI</option>
+            <option value="GPPS" selected>GPPS</option>
+            <option value="LS">LS</option>
+          </select>
+        </div>
+        <div class="field" id="scanValuesWField" hidden>
+          <label for="scanValuesW" id="scanValuesWLabelEl" data-i18n="scanValuesWLabel">第 4 個酵素濃度序列 (µM，以逗號分隔)</label>
+          <input type="text" id="scanValuesW" placeholder="0.03, 0.3, 3, 30, 300">
+        </div>
+        <p class="hint" id="scanMultiGridHint" data-i18n="scanMultiHint">超過 2 個酵素時，圖表只會畫出「X 軸酵素 × Y 軸酵素」這兩軸的熱力圖，其餘酵素用下方的下拉選單挑一個固定值當切片看；總格點數（各酵素數值個數相乘）上限 2000，太多會跑很久或直接被拒絕。</p>
       </div>
 
       <div class="field-group">
@@ -925,9 +978,16 @@ html, body {
         <div class="result-toolbar">
           <button class="btn-sm" data-export-csv="scan" data-i18n="exportCsv">匯出 CSV</button>
           <button class="btn-sm" data-export-png="scanResults" data-i18n="exportPng">匯出圖片</button>
+          <button class="btn-sm btn-sm--accent" id="scanAllEnzymesBtn" data-i18n="scanAllEnzymesBtn">同時掃描全部 4 個酵素比較</button>
         </div>
+        <p class="summary-line" id="scanSummaryLine"></p>
         <div id="scanTrajChart" class="chart"></div>
-        <div id="scanEndpointChart" class="chart"></div>
+        <div class="chart-grid">
+          <div id="scanAccumChart" class="chart"></div>
+          <div id="scanMeanFluxChart" class="chart"></div>
+          <div id="scanVolRateChart" class="chart"></div>
+          <div id="scanUtilizationChart" class="chart"></div>
+        </div>
 
         <details class="report-details">
           <summary data-i18n="rawDataToggle">顯示原始數據表格</summary>
@@ -940,6 +1000,8 @@ html, body {
           <button class="btn-sm" data-export-csv="scan2d" data-i18n="exportCsv">匯出 CSV</button>
           <button class="btn-sm" data-export-png="scan2dResults" data-i18n="exportPng">匯出圖片</button>
         </div>
+        <p class="summary-line" id="scan2dSummaryLine"></p>
+        <div class="preset-row" id="scan2dSliceControls" style="margin-bottom: 12px;"></div>
         <div id="scan2dFinalHeatmap" class="chart"></div>
         <div id="scan2dFluxHeatmap" class="chart"></div>
 
@@ -1095,14 +1157,14 @@ const I18N = {
     connectError: (msg) => `無法連線後端：${msg}`,
     modeFbaDesc: "單一時間點穩態通量",
     modeDfbaDesc: "誘導後動態時間序列",
-    modeScanLabel: "Etot 掃描",
-    modeScanDesc: "單酵素 OAT 廣域掃描",
-    modeScan2dLabel: "雙酵素掃描",
-    modeScan2dDesc: "雙酵素交叉掃描 (2D)",
-    modeOptimizeLabel: "自動最佳化",
-    modeOptimizeDesc: "Nelder-Mead 找最佳 Etot",
+    modeScanLabel: "Etot 分析",
+    modeScanDesc: "單酵素掃描／自動最佳化",
+    modeScan2dLabel: "多酵素掃描",
+    modeScan2dDesc: "2~4 酵素交叉掃描",
     runOptimize: "執行自動最佳化",
-    optimizeTitle: "自動最佳化設定",
+    scanSubModeLabel: "分析方式",
+    scanSubModeManual: "手動掃描（指定範圍）",
+    scanSubModeOptimize: "自動最佳化（Nelder-Mead）",
     optimizeMaxIterLabel: "最大迭代次數",
     optimizeHint: "從目前 Etot 欄位的數值開始搜尋，用穩態 FBA（非 dFBA）當目標函數，找出讓限烯烴通量最大化的 Etot(DXS/IDI/GPPS/LS) 組合。次數越多越準，但也越慢。",
     optimizeBestFluxLabel: "最佳限烯烴通量",
@@ -1123,11 +1185,33 @@ const I18N = {
     scanTitle: "掃描設定",
     scanEnzymeLabel: "掃描酵素",
     scanValuesLabel: "倍率／濃度序列 (µM，以逗號分隔)",
-    scan2dTitle: "雙酵素掃描設定",
+    scanLogHint: "結果圖表的 X 軸會用對數座標顯示，數值差距很大時比較容易一次看清楚。",
+    scan2dTitle: "多酵素掃描設定",
+    scanMultiCountLabel: "掃描酵素數量",
     scanEnzymeXLabel: "X 軸酵素",
     scanValuesXLabel: "X 軸濃度序列 (µM，以逗號分隔)",
     scanEnzymeYLabel: "Y 軸酵素",
     scanValuesYLabel: "Y 軸濃度序列 (µM，以逗號分隔)",
+    scanEnzymeZLabel: "第 3 個酵素",
+    scanValuesZLabel: "第 3 個酵素濃度序列 (µM，以逗號分隔)",
+    scanEnzymeWLabel: "第 4 個酵素",
+    scanValuesWLabel: "第 4 個酵素濃度序列 (µM，以逗號分隔)",
+    scanMultiHint: "超過 2 個酵素時，圖表只會畫出「X 軸酵素 × Y 軸酵素」這兩軸的熱力圖，其餘酵素用下方的下拉選單挑一個固定值當切片看；總格點數（各酵素數值個數相乘）上限 2000，太多會跑很久或直接被拒絕。",
+    scanStrategyLabel: "掃描策略",
+    scanStrategyGrid: "窮舉網格",
+    scanStrategyLhs: "LHS 取樣（Latin Hypercube）",
+    scanStrategySobol: "Sobol 序列（低差異準隨機）",
+    scanStrategyGridHint: "用你填的每個酵素候選值做完整交叉組合，格點數 = 各酵素候選值個數相乘。",
+    scanStrategyLhsHint: "統計學界標準的空間取樣方法（McKay, Conover & Beckman, 1979），用固定點數在整個範圍裡均勻分層取樣，格點數不會隨酵素數量爆炸。下面「濃度序列」欄位改成取每組數字裡的最小值/最大值當範圍，不是逐一列舉。",
+    scanStrategySobolHint: "低差異準隨機序列（Sobol, 1967），比純隨機更均勻覆蓋整個空間，常搭配 LHS 一起比較用。下面「濃度序列」欄位改成取每組數字裡的最小值/最大值當範圍，不是逐一列舉。",
+    scanNSamplesLabel: "取樣點數",
+    scanSampledResultTitle: (method) => `${method} 取樣結果：限烯烴濃度`,
+    scanSampledMethodLabel: "方法",
+    scanValueRangeSuffix: "（此模式只取最小/最大值當範圍）",
+    scanEnzymeDisabledHint: "（目前正在掃描這個酵素，此欄位不生效）",
+    scanFixedSummaryPrefix: "本次固定：",
+    scanScanningSummaryPrefix: "正在掃描：",
+    scan2dSliceLabel: "切片：",
     inductionTitle: "誘導與生長設定",
     inducedLabel: "誘導狀態",
     inducedTrue: "已加 IPTG（誘導後）",
@@ -1161,9 +1245,15 @@ const I18N = {
     growthRateLegend: "生長速率 μ",
     scanTrajTitle: (enzyme) => `${enzyme} Etot 掃描：限烯烴累積曲線`,
     extracellularLimAxis: "細胞外限烯烴 (mM)",
-    scanEndpointTitle: (enzyme) => `${enzyme}：通量與終點濃度 vs Etot`,
     maxFluxLegend: "最大誘導後通量",
     finalLimLegend: "終點限烯烴濃度",
+    etotFactorAxis: "Etot 相對基準值倍率",
+    scanAccumTitle: "累積產量（終點限烯烴濃度）",
+    scanMeanFluxTitle: "誘導後平均生產通量",
+    scanVolRateTitle: "最大體積生產速率",
+    scanUtilizationTitle: "掃描酵素的尖峰容量利用率 (v/UB)",
+    scanAllEnzymesBtn: "同時掃描全部 4 個酵素比較",
+    scanAllEnzymesRunning: "正在依序掃描 4 個酵素，請稍候…",
     scan2dFinalTitle: (x, y) => `終點限烯烴濃度 (mM)：${x} × ${y}`,
     scan2dFluxTitle: (x, y) => `最大誘導後通量 (mmol/gDW/h)：${x} × ${y}`,
     scan2dSameEnzymeError: "X 軸與 Y 軸酵素不可相同",
@@ -1275,14 +1365,14 @@ const I18N = {
     connectError: (msg) => `Could not reach backend: ${msg}`,
     modeFbaDesc: "Single time-point steady-state flux",
     modeDfbaDesc: "Post-induction dynamic time series",
-    modeScanLabel: "Etot Scan",
-    modeScanDesc: "Single-enzyme OAT wide-range scan",
-    modeScan2dLabel: "Dual-Enzyme Scan",
-    modeScan2dDesc: "Cross-scan two enzymes (2D)",
-    modeOptimizeLabel: "Auto-optimize",
-    modeOptimizeDesc: "Nelder-Mead search for best Etot",
+    modeScanLabel: "Etot Analysis",
+    modeScanDesc: "Manual scan / auto-optimize",
+    modeScan2dLabel: "Multi-Enzyme Scan",
+    modeScan2dDesc: "2-4 enzyme cross-scan",
     runOptimize: "Run auto-optimize",
-    optimizeTitle: "Auto-optimize settings",
+    scanSubModeLabel: "Analysis mode",
+    scanSubModeManual: "Manual scan (specify range)",
+    scanSubModeOptimize: "Auto-optimize (Nelder-Mead)",
     optimizeMaxIterLabel: "Max iterations",
     optimizeHint: "Starts from the current Etot field values and uses steady-state FBA (not dFBA) as the objective function, searching for the Etot(DXS/IDI/GPPS/LS) combination that maximizes limonene flux. More iterations = more accurate but slower.",
     optimizeBestFluxLabel: "Best limonene flux",
@@ -1303,11 +1393,33 @@ const I18N = {
     scanTitle: "Scan Settings",
     scanEnzymeLabel: "Scan Enzyme",
     scanValuesLabel: "Value series (µM, comma-separated)",
-    scan2dTitle: "Dual-Enzyme Scan Settings",
+    scanLogHint: "The result chart's X axis uses a log scale, which makes it easier to read when values span a wide range.",
+    scan2dTitle: "Multi-Enzyme Scan Settings",
+    scanMultiCountLabel: "Number of enzymes to scan",
     scanEnzymeXLabel: "X-axis Enzyme",
     scanValuesXLabel: "X-axis value series (µM, comma-separated)",
     scanEnzymeYLabel: "Y-axis Enzyme",
     scanValuesYLabel: "Y-axis value series (µM, comma-separated)",
+    scanEnzymeZLabel: "3rd Enzyme",
+    scanValuesZLabel: "3rd enzyme value series (µM, comma-separated)",
+    scanEnzymeWLabel: "4th Enzyme",
+    scanValuesWLabel: "4th enzyme value series (µM, comma-separated)",
+    scanMultiHint: "With more than 2 enzymes, the chart only shows a heatmap of the X-axis × Y-axis enzymes; use the dropdowns below to pick a fixed slice value for the rest. Total grid points (product of each enzyme's value count) are capped at 2000 — more than that will be slow or rejected.",
+    scanStrategyLabel: "Scan strategy",
+    scanStrategyGrid: "Exhaustive grid",
+    scanStrategyLhs: "LHS sampling (Latin Hypercube)",
+    scanStrategySobol: "Sobol sequence (low-discrepancy quasi-random)",
+    scanStrategyGridHint: "Full cross-product of the candidate values you entered for each enzyme; grid size = product of each enzyme's candidate count.",
+    scanStrategyLhsHint: "A standard space-filling sampling method (McKay, Conover & Beckman, 1979): a fixed number of stratified, evenly-spread samples across the whole range — grid size doesn't explode with more enzymes. The \"value series\" fields below are reinterpreted as [min, max] of whatever numbers you type, not an exhaustive list.",
+    scanStrategySobolHint: "A low-discrepancy quasi-random sequence (Sobol, 1967), more uniform than pure random sampling — often compared against LHS. The \"value series\" fields below are reinterpreted as [min, max] of whatever numbers you type, not an exhaustive list.",
+    scanNSamplesLabel: "Number of samples",
+    scanSampledResultTitle: (method) => `${method} sampling result: limonene concentration`,
+    scanSampledMethodLabel: "Method",
+    scanValueRangeSuffix: " (min/max only used as range in this mode)",
+    scanEnzymeDisabledHint: "(currently being scanned — this field has no effect)",
+    scanFixedSummaryPrefix: "Fixed this run: ",
+    scanScanningSummaryPrefix: "Scanning: ",
+    scan2dSliceLabel: "Slice: ",
     inductionTitle: "Induction & Growth Settings",
     inducedLabel: "Induction State",
     inducedTrue: "IPTG added (post-induction)",
@@ -1341,9 +1453,15 @@ const I18N = {
     growthRateLegend: "Growth rate μ",
     scanTrajTitle: (enzyme) => `${enzyme} Etot scan: limonene accumulation`,
     extracellularLimAxis: "Extracellular limonene (mM)",
-    scanEndpointTitle: (enzyme) => `${enzyme}: flux & endpoint concentration vs Etot`,
     maxFluxLegend: "Max post-induction flux",
     finalLimLegend: "Final limonene concentration",
+    etotFactorAxis: "Etot factor relative to baseline",
+    scanAccumTitle: "Accumulated product response",
+    scanMeanFluxTitle: "Mean post-induction production response",
+    scanVolRateTitle: "Maximum volumetric rate",
+    scanUtilizationTitle: "Peak capacity utilization of the scanned enzyme (v/UB)",
+    scanAllEnzymesBtn: "Compare all 4 enzymes",
+    scanAllEnzymesRunning: "Scanning all 4 enzymes in sequence, please wait…",
     scan2dFinalTitle: (x, y) => `Final limonene (mM): ${x} × ${y}`,
     scan2dFluxTitle: (x, y) => `Max post-induction flux (mmol/gDW/h): ${x} × ${y}`,
     scan2dSameEnzymeError: "X-axis and Y-axis enzyme cannot be the same",
@@ -1478,6 +1596,11 @@ const state = {
   compare: false,
   dfbaHistory: [],       // { runNo, time_h, limonene_mM, biomass_gDW_L, glycerol_mM, growth_rate_h, limonene_flux }
   lastResults: {},        // 各模式最近一次結果，供 CSV 匯出使用：{ fba, dfba, scan, scan2d }
+  scan2dSliceIndices: [],  // 多酵素掃描（3、4 個酵素）時，第 3、4 個維度目前選到的切片索引
+  scanDisplayMode: "single",  // "single"（單酵素）或 "all"（四個酵素疊圖比較），決定
+                               // 語言/主題切換重繪、CSV 匯出時要用哪一份資料
+  scanSubMode: "manual",  // "manual"（手動掃描）或 "optimize"（自動最佳化）——
+                           // Etot 分析這個分頁底下的兩種子模式
 };
 
 const els = {
@@ -1488,7 +1611,14 @@ const els = {
   statusHint: document.getElementById("statusHint"),
   scanFieldGroup: document.getElementById("scanFieldGroup"),
   scan2dFieldGroup: document.getElementById("scan2dFieldGroup"),
-  optimizeFieldGroup: document.getElementById("optimizeFieldGroup"),
+  scanNSamplesField: document.getElementById("scanNSamplesField"),
+  scanEnzymeZField: document.getElementById("scanEnzymeZField"),
+  scanValuesZField: document.getElementById("scanValuesZField"),
+  scanEnzymeWField: document.getElementById("scanEnzymeWField"),
+  scanValuesWField: document.getElementById("scanValuesWField"),
+  scan2dSliceControls: document.getElementById("scan2dSliceControls"),
+  scanManualFields: document.getElementById("scanManualFields"),
+  scanOptimizeFields: document.getElementById("scanOptimizeFields"),
   stepModeField: document.getElementById("stepModeField"),
   inducedField: document.getElementById("inducedField"),
   durationField: document.getElementById("durationField"),
@@ -1507,9 +1637,13 @@ function modeConfig() {
   return {
     fba: { label: t("runFba"), resultBlock: "fbaResults" },
     dfba: { label: t("runDfba"), resultBlock: "dfbaResults" },
-    scan: { label: t("runScan"), resultBlock: "scanResults" },
+    // scan 現在涵蓋「手動掃描」跟「自動最佳化」兩種子模式，用哪個結果區塊、
+    // 執行按鈕文字，要看 state.scanSubMode 現在是哪一個。
+    scan: {
+      label: state.scanSubMode === "optimize" ? t("runOptimize") : t("runScan"),
+      resultBlock: state.scanSubMode === "optimize" ? "optimizeResults" : "scanResults",
+    },
     scan2d: { label: t("runScan2d"), resultBlock: "scan2dResults" },
-    optimize: { label: t("runOptimize"), resultBlock: "optimizeResults" },
   };
 }
 
@@ -1668,7 +1802,11 @@ function bindInfoPages() {
 function rerenderAllResults() {
   if (state.lastResults.fba) renderFbaAll(state.lastResults.fba);
   if (state.dfbaHistory.length) renderDfbaCharts();
-  if (state.lastResults.scan) renderScanCharts(state.lastResults.scan);
+  if (state.scanDisplayMode === "all" && state.lastResults.scanAll) {
+    renderScanAllCharts(state.lastResults.scanAll);
+  } else if (state.lastResults.scan) {
+    renderScanCharts(state.lastResults.scan);
+  }
   if (state.lastResults.scan2d) renderScan2dCharts(state.lastResults.scan2d);
   if (state.lastResults.optimize) renderOptimizeResults(state.lastResults.optimize);
 }
@@ -1697,17 +1835,98 @@ function populateDefaults(d) {
 
   document.getElementById("scanEnzyme").addEventListener("change", (e) => {
     document.getElementById("scanValues").value = d.scan_values[e.target.value].join(", ");
+    updateScanEnzymeDisabledStates();
   });
 
   document.getElementById("scanValuesX").value = d.scan_values["LS"].join(", ");
   document.getElementById("scanValuesY").value = d.scan_values["DXS"].join(", ");
+  document.getElementById("scanValuesZ").value = d.scan_values["IDI"].join(", ");
+  document.getElementById("scanValuesW").value = d.scan_values["GPPS"].join(", ");
 
-  document.getElementById("scanEnzymeX").addEventListener("change", (e) => {
-    document.getElementById("scanValuesX").value = d.scan_values[e.target.value].join(", ");
+  for (const axis of ["X", "Y", "Z", "W"]) {
+    document.getElementById(`scanEnzyme${axis}`).addEventListener("change", (e) => {
+      document.getElementById(`scanValues${axis}`).value = d.scan_values[e.target.value].join(", ");
+      updateScanEnzymeDisabledStates();
+    });
+  }
+
+  document.getElementById("scanMultiCount").addEventListener("change", () => {
+    updateScanMultiFieldsVisibility();
+    updateScanEnzymeDisabledStates();
   });
-  document.getElementById("scanEnzymeY").addEventListener("change", (e) => {
-    document.getElementById("scanValuesY").value = d.scan_values[e.target.value].join(", ");
+  document.getElementById("scanStrategy").addEventListener("change", updateScanStrategyUI);
+  document.getElementById("scanSubMode").addEventListener("change", (e) => {
+    state.scanSubMode = e.target.value;
+    updateModeUI();
   });
+
+  updateScanMultiFieldsVisibility();
+  updateScanStrategyUI();
+  updateScanEnzymeDisabledStates();
+}
+
+/* 掃描模式（單酵素／多酵素）目前選到的酵素，在「酵素總濃度 Etot」欄位裡填了也不會
+   生效（會被掃描序列接管），之前造成使用者誤會「怎麼改都沒用」。這裡把對應的
+   Etot 輸入框直接灰掉禁用，並在標籤旁加提示文字，讓「用過的酵素」一眼看得出來
+   已經被掃描設定接管了。 */
+function updateScanEnzymeDisabledStates() {
+  const activeEnzymes = new Set();
+  if (state.mode === "scan") {
+    activeEnzymes.add(document.getElementById("scanEnzyme").value);
+  } else if (state.mode === "scan2d") {
+    const count = Number(document.getElementById("scanMultiCount").value) || 2;
+    const axes = ["X", "Y", "Z", "W"].slice(0, count);
+    axes.forEach((axis) => activeEnzymes.add(document.getElementById(`scanEnzyme${axis}`).value));
+  }
+  for (const enzyme of ["DXS", "IDI", "GPPS", "LS"]) {
+    const input = document.getElementById(`etot-${enzyme}`);
+    const hintId = `etotDisabledHint-${enzyme}`;
+    let hint = document.getElementById(hintId);
+    if (activeEnzymes.has(enzyme)) {
+      input.disabled = true;
+      if (!hint) {
+        hint = document.createElement("span");
+        hint.id = hintId;
+        hint.className = "hint";
+        hint.style.display = "block";
+        hint.textContent = t("scanEnzymeDisabledHint");
+        input.insertAdjacentElement("afterend", hint);
+      }
+    } else {
+      input.disabled = false;
+      if (hint) hint.remove();
+    }
+  }
+}
+
+/* 掃描酵素數量（2/3/4）決定要不要顯示第 3、4 個酵素欄位。 */
+function updateScanMultiFieldsVisibility() {
+  const count = Number(document.getElementById("scanMultiCount").value) || 2;
+  els.scanEnzymeZField.hidden = count < 3;
+  els.scanValuesZField.hidden = count < 3;
+  els.scanEnzymeWField.hidden = count < 4;
+  els.scanValuesWField.hidden = count < 4;
+}
+
+/* 掃描策略（窮舉網格／LHS／Sobol）決定要不要顯示「取樣點數」欄位、切換提示文字，
+   並且把「濃度序列」那幾個輸入框的標籤改成提醒使用者：非網格模式下這欄位
+   只取「最小值～最大值」當範圍，不是逐一列舉的候選值清單。 */
+function updateScanStrategyUI() {
+  const strategy = document.getElementById("scanStrategy").value;
+  const isSampled = strategy !== "grid";
+  els.scanNSamplesField.hidden = !isSampled;
+  document.getElementById("scanMultiGridHint").hidden = isSampled;
+
+  const hintKey = strategy === "lhs" ? "scanStrategyLhsHint"
+    : strategy === "sobol" ? "scanStrategySobolHint" : "scanStrategyGridHint";
+  document.getElementById("scanStrategyHint").textContent = t(hintKey);
+
+  for (const axis of ["X", "Y", "Z", "W"]) {
+    const labelEl = document.getElementById(`scanValues${axis}LabelEl`);
+    if (!labelEl) continue;
+    const baseKey = { X: "scanValuesXLabel", Y: "scanValuesYLabel", Z: "scanValuesZLabel", W: "scanValuesWLabel" }[axis];
+    labelEl.textContent = isSampled ? `${t(baseKey)}${t("scanValueRangeSuffix")}` : t(baseKey);
+  }
 }
 
 function bindModeTabs() {
@@ -1725,20 +1944,25 @@ function updateModeUI() {
   const cfg = modeConfig()[state.mode];
   els.runBtnLabel.textContent = cfg.label;
 
+  const isOptimize = state.mode === "scan" && state.scanSubMode === "optimize";
   els.scanFieldGroup.hidden = state.mode !== "scan";
   els.scan2dFieldGroup.hidden = state.mode !== "scan2d";
-  els.optimizeFieldGroup.hidden = state.mode !== "optimize";
+  els.scanManualFields.hidden = state.mode === "scan" && isOptimize;
+  els.scanOptimizeFields.hidden = !(state.mode === "scan" && isOptimize);
   els.inducedField.hidden = state.mode !== "fba";
-  els.durationField.hidden = state.mode === "fba" || state.mode === "optimize";
+  els.durationField.hidden = state.mode === "fba" || isOptimize;
   // step_mode 只有內部真的會跑 dFBA 引擎的模式才有意義：dFBA 本身、以及
-  // Etot 掃描／2D 掃描（每個網格點內部其實也是各跑一次 dFBA）。
-  els.stepModeField.hidden = !["dfba", "scan", "scan2d"].includes(state.mode);
+  // Etot 掃描／2D 掃描（每個網格點內部其實也是各跑一次 dFBA）；自動最佳化
+  // 子模式底層是穩態 FBA，不是 dFBA，這裡也要排除。
+  els.stepModeField.hidden = isOptimize || !["dfba", "scan", "scan2d"].includes(state.mode);
   els.compareField.hidden = state.mode !== "dfba";
   els.compareClearRow.hidden = state.mode !== "dfba" || state.dfbaHistory.length === 0;
 
   for (const key of ["fbaResults", "dfbaResults", "scanResults", "scan2dResults", "optimizeResults"]) {
     document.getElementById(key).hidden = key !== cfg.resultBlock;
   }
+  if (state.mode === "scan2d") updateScanMultiFieldsVisibility();
+  updateScanEnzymeDisabledStates();
   els.statusHint.textContent = "";
   els.statusHint.className = "hint";
 }
@@ -1778,9 +2002,10 @@ async function runCurrentMode() {
   try {
     if (state.mode === "fba") await runFba();
     else if (state.mode === "dfba") await runDfba();
-    else if (state.mode === "scan") await runScan();
-    else if (state.mode === "scan2d") await runScan2d();
-    else await runOptimize();
+    else if (state.mode === "scan") {
+      if (state.scanSubMode === "optimize") await runOptimize();
+      else await runScan();
+    } else await runScan2d();
     els.statusHint.textContent = t("done");
   } catch (err) {
     els.statusHint.className = "hint hint--error";
@@ -2243,16 +2468,34 @@ function renderDataTable(mode, data) {
     ]);
     html = buildTableHtml(headers, rows);
   } else if (mode === "scan") {
-    const headers = ["Etot (µM)", "final limonene (mM)", "max post-IPTG flux (mmol/gDW/h)"];
-    const rows = data.results.map((r) => [fmt(r.etot_uM, 3), fmt(r.final_limonene_mM, 2), fmt(r.max_post_iptg_flux, 2)]);
+    const headers = ["Etot (µM)", "Etot factor", "final limonene (mM)", "max post-IPTG flux (mmol/gDW/h)",
+      "mean post-induction flux (mmol/gDW/h)", "max volumetric rate (mM/h)", "peak utilization (v/UB)"];
+    const rows = data.results.map((r) => [
+      fmt(r.etot_uM, 3), fmt(r.etot_factor, 3), fmt(r.final_limonene_mM, 2), fmt(r.max_post_iptg_flux, 2),
+      fmt(r.mean_post_induction_flux_mmol_gDW_h, 4), fmt(r.max_volumetric_rate_mM_h, 4),
+      fmt(r.peak_capacity_utilization, 4),
+    ]);
     html = buildTableHtml(headers, rows);
   } else if (mode === "scan2d") {
-    const headers = [`${data.enzyme_y} \\ ${data.enzyme_x}`, ...data.values_x.map((v) => fmt(v, 3))];
-    const rows = data.values_y.map((y, i) => [
-      fmt(y, 3), ...data.final_limonene_mM[i].map((v) => fmt(v, 3)),
-    ]);
-    html = `<p style="padding:8px 12px;margin:0;font-size:11px;color:var(--text-muted);">${t("rawDataScan2dNote")}</p>` +
-      buildTableHtml(headers, rows);
+    if (data.method) {
+      // 取樣結果：每一列就是一組取樣點，直接列出所有酵素的 Etot 值＋兩個結果值。
+      const headers = [...data.enzymes.map((e) => `${e}_Etot_uM`), "final_limonene_mM", "max_post_iptg_flux"];
+      const rows = data.results.map((r) => [
+        ...data.enzymes.map((e) => fmt(r.etot[e], 3)),
+        fmt(r.final_limonene_mM, 3), fmt(r.max_post_iptg_flux, 4),
+      ]);
+      html = buildTableHtml(headers, rows);
+    } else {
+      const enzymeX = data.enzymes[0];
+      const enzymeY = data.enzymes[1];
+      const { xVals, yVals, zFinal } = extractScan2dSlice(data, state.scan2dSliceIndices || []);
+      const headers = [`${enzymeY} \\ ${enzymeX}`, ...xVals.map((v) => fmt(v, 3))];
+      const rows = yVals.map((y, i) => [
+        fmt(y, 3), ...zFinal[i].map((v) => fmt(v, 3)),
+      ]);
+      html = `<p style="padding:8px 12px;margin:0;font-size:11px;color:var(--text-muted);">${t("rawDataScan2dNote")}</p>` +
+        buildTableHtml(headers, rows);
+    }
   } else if (mode === "optimize") {
     const headers = ["#", "DXS", "IDI", "GPPS", "LS", "limonene_flux (mmol/gDW/h)"];
     const rows = (data.history || []).map((h, i) => [
@@ -2271,12 +2514,49 @@ async function runScan() {
     .split(",").map((s) => Number(s.trim())).filter((n) => !Number.isNaN(n));
   const params = readCommonParams();
   const data = await postJson("/api/etot-scan", { enzyme, scan_values: scanValues, params });
-  state.lastResults.scan = { enzyme, results: data.results };
+  state.lastResults.scan = { enzyme, results: data.results, params };
+  state.scanDisplayMode = "single";
   renderScanCharts(state.lastResults.scan);
+}
+
+/* 白話提示：這次掃描固定了哪些酵素在多少、正在掃哪個——避免像之前 DXS/LS
+   已經飽和、使用者卻搞不懂為什麼數字都沒變的情況。 */
+function renderScanFixedSummary(elId, scanningEnzymes, params) {
+  const fixedParts = ["DXS", "IDI", "GPPS", "LS"]
+    .filter((e) => !scanningEnzymes.includes(e))
+    .map((e) => `${e}=${fmt(params.Etot[e], 3)} µM`);
+  const scanningLabel = scanningEnzymes.join(" × ");
+  const text = `${t("scanScanningSummaryPrefix")}${scanningLabel}　${t("scanFixedSummaryPrefix")}${fixedParts.join("、")}`;
+  document.getElementById(elId).textContent = text;
+}
+
+/* 對數軸圖表如果直接讓 Plotly 自動縮放到「緊貼資料本身的最小/最大值」，
+   當真實差距只有小數點後好幾位（例如 DXS/GPPS/IDI 本來就不是瓶頸，改了也
+   幾乎沒差）時，畫面會被拉伸成一條看起來很陡的線，誤導人以為變化很大。
+   這裡改成強制對數軸至少涵蓋 MIN_LOG_DECADES 個數量級：真的沒什麼變化的線
+   看起來就是平的，只有真的橫跨很多數量級的才會呈現明顯斜率——線的「陡不陡」
+   才會忠實反映「差距大不大」，不同酵素、不同指標之間也能公平比較。 */
+const MIN_LOG_DECADES = 4;
+function computeLogAxisRange(values) {
+  const positives = values.filter((v) => Number.isFinite(v) && v > 0);
+  if (!positives.length) return undefined;
+  const logMin = Math.log10(Math.min(...positives));
+  const logMax = Math.log10(Math.max(...positives));
+  const span = logMax - logMin;
+  if (span >= MIN_LOG_DECADES) {
+    // 資料本身已經橫跨夠多數量級，只留一點點邊界，不用強制擴大。
+    const pad = Math.max(0.1, span * 0.05);
+    return [logMin - pad, logMax + pad];
+  }
+  const center = (logMin + logMax) / 2;
+  const half = MIN_LOG_DECADES / 2;
+  return [center - half, center + half];
 }
 
 function renderScanCharts(scanData) {
   const enzyme = scanData.enzyme;
+  renderScanFixedSummary("scanSummaryLine", [enzyme], scanData.params || readCommonParams());
+
   const trajTraces = scanData.results.map((r, i) => ({
     x: r.trace.time_h,
     y: r.trace.limonene_mM,
@@ -2290,61 +2570,289 @@ function renderScanCharts(scanData) {
     yaxis: { ...plotlyLayoutBase().yaxis, title: t("extracellularLimAxis") },
   }, { displayModeBar: false, responsive: true });
 
-  const etotVals = scanData.results.map((r) => r.etot_uM);
-  const finalLim = scanData.results.map((r) => r.final_limonene_mM);
-  const maxFlux = scanData.results.map((r) => r.max_post_iptg_flux);
-  // Y 軸範圍強制從 0 開始，不讓 Plotly 自動縮放到「只框住微小差異」的極窄範圍——
-  // 不然像 DXS/LS 這種其實幾乎沒差的平坦數據，會被誇張放大成看起來劇烈起伏的假象。
-  // Y 軸範圍改成貼著資料本身的最小/最大值留 0.01 的邊界，不再強制從 0 開始——
-  // 這樣資料的實際高低變化看得更清楚，不會因為固定拉到 0 而把曲線壓得很平。
-  const maxFluxRange = [Math.min(...maxFlux) - 0.01, Math.max(...maxFlux) + 0.01];
-  const finalLimRange = [Math.min(...finalLim) - 0.01, Math.max(...finalLim) + 0.01];
-  Plotly.newPlot("scanEndpointChart", [
-    { x: etotVals, y: maxFlux, name: t("maxFluxLegend"), type: "scatter", mode: "lines+markers",
-      line: { color: accentColors()[0] }, hovertemplate: "%{y:.2f}<extra></extra>" },
-    { x: etotVals, y: finalLim, name: t("finalLimLegend"), yaxis: "y2", type: "scatter", mode: "lines+markers",
-      line: { color: accentColors()[1], dash: "dash" }, hovertemplate: "%{y:.2f}<extra></extra>" },
-  ], {
-    ...plotlyLayoutBase(),
-    title: { text: t("scanEndpointTitle", enzyme), font: { size: 13, color: chartTitleColor() } },
-    xaxis: { ...plotlyLayoutBase().xaxis, title: `${enzyme} Etot (µM)`, type: "log" },
-    yaxis: { ...plotlyLayoutBase().yaxis, title: "mmol/gDW/h", range: maxFluxRange, tickformat: ".2f" },
-    yaxis2: { overlaying: "y", side: "right", showgrid: false, title: "mM", range: finalLimRange, tickformat: ".2f" },
-  }, { displayModeBar: false, responsive: true });
+  // 對照 V9 OAT capacity scan 的四格診斷圖排版：橫軸統一是「相對於基準值的
+  // Etot 倍率」，全部用 log-log；四個指標各自獨立成一張圖，不再擠在同一張圖
+  // 用雙 Y 軸表示——這樣一次看到「累積產量」「平均通量」「體積生產速率」
+  // 「這個酵素自己被用到多滿（v/UB）」四個不同角度，尤其最後一項是很直接的
+  // 判斷依據：utilization 長期貼近 1 代表這個酵素接近滿載、是瓶頸；長期偏低
+  // 代表這個酵素還有餘裕，卡住產量的是別的東西（不是這顆酵素）。
+  const etotFactors = scanData.results.map((r) => r.etot_factor ?? r.etot_uM);
+  const xAxisLog = { ...plotlyLayoutBase().xaxis, title: t("etotFactorAxis"), type: "log" };
+
+  const logChart = (containerId, yKey, titleKey, yTitle, color) => {
+    const yVals = scanData.results.map((r) => r[yKey]);
+    Plotly.newPlot(containerId, [{
+      x: etotFactors,
+      y: yVals,
+      type: "scatter",
+      mode: "lines+markers",
+      line: { color },
+      marker: { size: 7 },
+    }], {
+      ...plotlyLayoutBase(),
+      title: { text: t(titleKey), font: { size: 13, color: chartTitleColor() } },
+      xaxis: xAxisLog,
+      yaxis: { ...plotlyLayoutBase().yaxis, title: yTitle, type: "log", range: computeLogAxisRange(yVals) },
+    }, { displayModeBar: false, responsive: true });
+  };
+
+  logChart("scanAccumChart", "final_limonene_mM", "scanAccumTitle", "mM", accentColors()[0]);
+  logChart("scanMeanFluxChart", "mean_post_induction_flux_mmol_gDW_h", "scanMeanFluxTitle",
+    "mmol/gDW/h", accentColors()[1]);
+  logChart("scanVolRateChart", "max_volumetric_rate_mM_h", "scanVolRateTitle",
+    "mM/h", accentColors()[2]);
+  logChart("scanUtilizationChart", "peak_capacity_utilization", "scanUtilizationTitle",
+    "v / UB", accentColors()[3]);
 
   renderDataTable("scan", scanData);
 }
 
-/* ---------------- 雙酵素 Etot 2D 掃描 ---------------- */
-async function runScan2d() {
-  const enzymeX = document.getElementById("scanEnzymeX").value;
-  const enzymeY = document.getElementById("scanEnzymeY").value;
-  if (enzymeX === enzymeY) throw new Error(t("scan2dSameEnzymeError"));
+/* 對照參考圖（V9 Etot one-at-a-time capacity scan）：那張圖其實是把「DXS／IDI／
+   GPPS／LS 各自獨立掃描一次」的四條結果疊在同一組 4 格圖上，不是只看一個酵素。
+   這裡依序對四個酵素各打一次 /api/etot-scan（各自用登錄表 (LIM009_params.csv)
+   自己的預設濃度序列，不用你目前掃描設定欄位打的那組值），拿到結果後疊圖畫出來。
+   軌跡圖（濃度 vs 時間）在這個模式下不畫——四個酵素各自的濃度序列點數加起來
+   會有 15~20 條線疊在一起，反而看不清楚，這點也跟參考圖一致（它也沒有軌跡圖，
+   只有這 4 張診斷圖）。 */
+async function runScanAllEnzymes() {
+  const enzymes = ["DXS", "IDI", "GPPS", "LS"];
+  els.statusHint.textContent = t("scanAllEnzymesRunning");
 
-  const valuesX = document.getElementById("scanValuesX").value
-    .split(",").map((s) => Number(s.trim())).filter((n) => !Number.isNaN(n));
-  const valuesY = document.getElementById("scanValuesY").value
-    .split(",").map((s) => Number(s.trim())).filter((n) => !Number.isNaN(n));
   const params = readCommonParams();
-  const data = await postJson("/api/etot-scan-2d", {
-    enzyme_x: enzymeX, enzyme_y: enzymeY,
-    values_x: valuesX, values_y: valuesY, params,
+  const allResults = {};
+  for (const enzyme of enzymes) {
+    const data = await postJson("/api/etot-scan", { enzyme, params });
+    allResults[enzyme] = data.results;
+  }
+
+  state.lastResults.scanAll = { enzymes, allResults, params };
+  state.scanDisplayMode = "all";
+  renderScanAllCharts(state.lastResults.scanAll);
+}
+
+function renderScanAllCharts(scanAllData) {
+  const { enzymes, allResults, params } = scanAllData;
+
+  document.getElementById("scanSummaryLine").textContent =
+    `${t("scanScanningSummaryPrefix")}${enzymes.join(", ")}`;
+
+  // 軌跡圖在這個模式下清空，避免四個酵素、每個 5 條線疊在一起看不清楚。
+  Plotly.newPlot("scanTrajChart", [], {
+    ...plotlyLayoutBase(),
+    title: { text: t("scanAllEnzymesBtn"), font: { size: 13, color: chartTitleColor() } },
+    xaxis: { ...plotlyLayoutBase().xaxis, title: t("timeAxis") },
+    yaxis: { ...plotlyLayoutBase().yaxis, title: t("extracellularLimAxis") },
+  }, { displayModeBar: false, responsive: true });
+
+  const logChartMulti = (containerId, yKey, titleKey, yTitle) => {
+    const traces = enzymes.map((enzyme, i) => {
+      const results = allResults[enzyme];
+      return {
+        x: results.map((r) => r.etot_factor ?? r.etot_uM),
+        y: results.map((r) => r[yKey]),
+        name: enzyme,
+        type: "scatter",
+        mode: "lines+markers",
+        line: { color: accentColors()[i % accentColors().length] },
+        marker: { size: 7 },
+      };
+    });
+    // 4 條線（4 個酵素）共用同一個 Y 軸範圍，這樣才能公平比較彼此的斜率——
+    // 如果每個酵素各自獨立算範圍，本來平的線也會被放大成看起來有變化。
+    const allYVals = traces.flatMap((tr) => tr.y);
+    Plotly.newPlot(containerId, traces, {
+      ...plotlyLayoutBase(),
+      title: { text: t(titleKey), font: { size: 13, color: chartTitleColor() } },
+      xaxis: { ...plotlyLayoutBase().xaxis, title: t("etotFactorAxis"), type: "log" },
+      yaxis: { ...plotlyLayoutBase().yaxis, title: yTitle, type: "log", range: computeLogAxisRange(allYVals) },
+      showlegend: true,
+    }, { displayModeBar: false, responsive: true });
+  };
+
+  logChartMulti("scanAccumChart", "final_limonene_mM", "scanAccumTitle", "mM");
+  logChartMulti("scanMeanFluxChart", "mean_post_induction_flux_mmol_gDW_h", "scanMeanFluxTitle", "mmol/gDW/h");
+  logChartMulti("scanVolRateChart", "max_volumetric_rate_mM_h", "scanVolRateTitle", "mM/h");
+  logChartMulti("scanUtilizationChart", "peak_capacity_utilization", "scanUtilizationTitle", "v / UB");
+
+  // 原始數據表格改列出四個酵素攤平後的完整結果，跟單酵素模式的表格分開處理。
+  const container = document.getElementById("scanDataTable");
+  if (container) {
+    const headers = ["enzyme", "etot_uM", "etot_factor", "final_limonene_mM",
+      "mean_post_induction_flux_mmol_gDW_h", "max_volumetric_rate_mM_h", "peak_capacity_utilization"];
+    const rows = [];
+    for (const enzyme of enzymes) {
+      for (const r of allResults[enzyme]) {
+        rows.push([enzyme, fmt(r.etot_uM, 3), fmt(r.etot_factor, 3), fmt(r.final_limonene_mM, 4),
+          fmt(r.mean_post_induction_flux_mmol_gDW_h, 6), fmt(r.max_volumetric_rate_mM_h, 6),
+          fmt(r.peak_capacity_utilization, 4)]);
+      }
+    }
+    container.innerHTML = buildTableHtml(headers, rows);
+  }
+}
+
+document.getElementById("scanAllEnzymesBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("scanAllEnzymesBtn");
+  btn.disabled = true;
+  try {
+    await runScanAllEnzymes();
+    els.statusHint.textContent = t("done");
+  } catch (err) {
+    els.statusHint.className = "hint hint--error";
+    els.statusHint.textContent = t("errorPrefix", err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ---------------- 多酵素 Etot 交叉掃描（2~4 個） ---------------- */
+async function runScan2d() {
+  const count = Number(document.getElementById("scanMultiCount").value) || 2;
+  const axes = ["X", "Y", "Z", "W"].slice(0, count);
+  const enzymes = axes.map((axis) => document.getElementById(`scanEnzyme${axis}`).value);
+  if (new Set(enzymes).size !== enzymes.length) throw new Error(t("scan2dSameEnzymeError"));
+
+  const valuesList = axes.map((axis) => document.getElementById(`scanValues${axis}`).value
+    .split(",").map((s) => Number(s.trim())).filter((n) => !Number.isNaN(n)));
+
+  const params = readCommonParams();
+  const strategy = document.getElementById("scanStrategy").value;
+
+  if (strategy === "grid") {
+    const data = await postJson("/api/etot-scan-multi", { enzymes, values_list: valuesList, params });
+    data.params = params;
+    state.lastResults.scan2d = data;
+    state.scan2dSliceIndices = new Array(Math.max(0, enzymes.length - 2)).fill(0);
+    renderScan2dCharts(data);
+    return;
+  }
+
+  // LHS／Sobol 取樣模式：「濃度序列」欄位改成只取最小/最大值當範圍，不是逐一列舉。
+  const bounds = valuesList.map((vals) => [Math.min(...vals), Math.max(...vals)]);
+  const nSamples = Number(document.getElementById("scanNSamples").value) || 50;
+  const data = await postJson("/api/etot-scan-sampled", {
+    enzymes, bounds, method: strategy, n_samples: nSamples, params,
   });
+  data.params = params;
   state.lastResults.scan2d = data;
   renderScan2dCharts(data);
 }
 
+/* 從 N 維巢狀陣列裡取出「enzymes[0] × enzymes[1]」那個 2D 切片，其餘維度
+   （enzymes[2]、enzymes[3]，如果有的話）固定在 sliceIndices 指定的索引。 */
+function extractScan2dSlice(data, sliceIndices) {
+  const xVals = data.values_list[0];
+  const yVals = data.values_list[1];
+  const zFinal = [];
+  const zFlux = [];
+  for (let iy = 0; iy < yVals.length; iy++) {
+    const rowFinal = [];
+    const rowFlux = [];
+    for (let ix = 0; ix < xVals.length; ix++) {
+      const idx = [ix, iy, ...sliceIndices];
+      let nodeFinal = data.final_limonene_mM;
+      let nodeFlux = data.max_post_iptg_flux;
+      for (const i of idx) { nodeFinal = nodeFinal[i]; nodeFlux = nodeFlux[i]; }
+      rowFinal.push(nodeFinal);
+      rowFlux.push(nodeFlux);
+    }
+    zFinal.push(rowFinal);
+    zFlux.push(rowFlux);
+  }
+  return { xVals, yVals, zFinal, zFlux };
+}
+
+/* 3、4 個酵素時，額外的維度（enzymes[2]／enzymes[3]）沒辦法畫進 2D 熱力圖，
+   改成下拉選單讓使用者挑一個固定值當「切片」，選了之後不用重打 API，
+   直接從已經拿到的完整資料裡重新切一次、重畫圖表。 */
+function renderScan2dSliceControls(data) {
+  const container = els.scan2dSliceControls;
+  container.innerHTML = "";
+  if (data.enzymes.length <= 2) return;
+
+  data.enzymes.slice(2).forEach((enzyme, dimOffset) => {
+    const dim = dimOffset + 2;
+    const label = document.createElement("label");
+    label.textContent = `${t("scan2dSliceLabel")}${enzyme}`;
+    label.style.marginRight = "6px";
+    label.style.color = "var(--text-muted)";
+    label.style.fontSize = "12.5px";
+    label.style.fontFamily = "var(--font-mono)";
+    label.style.display = "flex";
+    label.style.alignItems = "center";
+    label.style.gap = "6px";
+
+    const select = document.createElement("select");
+    data.values_list[dim].forEach((v, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = `${v}`;
+      if (i === state.scan2dSliceIndices[dim - 2]) opt.selected = true;
+      select.appendChild(opt);
+    });
+    select.addEventListener("change", () => {
+      state.scan2dSliceIndices[dim - 2] = Number(select.value);
+      renderScan2dCharts(state.lastResults.scan2d);
+    });
+
+    label.appendChild(select);
+    container.appendChild(label);
+  });
+}
+
+/* 分派器：資料有 data.method（"lhs"/"sobol"）代表是取樣結果（散佈點，不是規則
+   網格），沒有就是窮舉網格結果——兩種資料結構完全不同，畫法也不一樣。 */
 function renderScan2dCharts(data) {
-  const enzymeX = data.enzyme_x;
-  const enzymeY = data.enzyme_y;
-  const xLabels = data.values_x.map((v) => `${v}`);
-  const yLabels = data.values_y.map((v) => `${v}`);
+  if (data.method) {
+    renderScan2dSampledCharts(data);
+  } else {
+    renderScan2dGridCharts(data);
+  }
+}
+
+function renderScan2dGridCharts(data) {
+  const enzymeX = data.enzymes[0];
+  const enzymeY = data.enzymes[1];
+  renderScanFixedSummary("scan2dSummaryLine", data.enzymes, data.params || readCommonParams());
+
+  const dim2Count = data.enzymes.length >= 3 ? data.values_list[2].length : 1;
+  const dim3Count = data.enzymes.length >= 4 ? data.values_list[3].length : 1;
+  const facetCount = dim2Count * dim3Count;
+
+  if (data.enzymes.length <= 2 || facetCount > 16) {
+    // 2 個酵素本來就只有一張圖；超過 16 個切片會擠成一團看不清楚，這兩種
+    // 情況都退回「單張切片＋下拉選單」的舊模式。
+    els.scan2dSliceControls.hidden = data.enzymes.length <= 2;
+    renderScan2dSliceControls(data);
+    renderSingleSliceHeatmaps(data, state.scan2dSliceIndices || []);
+  } else {
+    // 3、4 個酵素、切片數不多時：一次把所有切片的小圖排出來，不用切換。
+    els.scan2dSliceControls.hidden = true;
+    els.scan2dSliceControls.innerHTML = "";
+    renderSmallMultipleHeatmaps("scan2dFinalHeatmap", data, "zFinal",
+      [[0, cssVar("--bg-panel")], [1, cssVar("--accent")]], "mM",
+      t("scan2dFinalTitle", enzymeX, enzymeY));
+    renderSmallMultipleHeatmaps("scan2dFluxHeatmap", data, "zFlux",
+      [[0, cssVar("--bg-panel")], [1, cssVar("--leaf")]], "mmol/gDW/h",
+      t("scan2dFluxTitle", enzymeX, enzymeY));
+  }
+
+  renderDataTable("scan2d", data);
+}
+
+/* 單張切片模式（2 個酵素，或切片太多退回這個模式時使用）。 */
+function renderSingleSliceHeatmaps(data, sliceIndices) {
+  const enzymeX = data.enzymes[0];
+  const enzymeY = data.enzymes[1];
+  const { xVals, yVals, zFinal, zFlux } = extractScan2dSlice(data, sliceIndices);
+  const xLabels = xVals.map((v) => `${v}`);
+  const yLabels = yVals.map((v) => `${v}`);
 
   Plotly.newPlot("scan2dFinalHeatmap", [{
     type: "heatmap",
     x: xLabels,
     y: yLabels,
-    z: data.final_limonene_mM,
+    z: zFinal,
     colorscale: [[0, cssVar("--bg-panel")], [1, cssVar("--accent")]],
     colorbar: { title: "mM", titleside: "right" },
   }], {
@@ -2358,12 +2866,151 @@ function renderScan2dCharts(data) {
     type: "heatmap",
     x: xLabels,
     y: yLabels,
-    z: data.max_post_iptg_flux,
+    z: zFlux,
     colorscale: [[0, cssVar("--bg-panel")], [1, cssVar("--leaf")]],
     colorbar: { title: "mmol/gDW/h", titleside: "right" },
   }], {
     ...plotlyLayoutBase(),
     title: { text: t("scan2dFluxTitle", enzymeX, enzymeY), font: { size: 13, color: chartTitleColor() } },
+    xaxis: { ...plotlyLayoutBase().xaxis, title: `${enzymeX} Etot (µM)` },
+    yaxis: { ...plotlyLayoutBase().yaxis, title: `${enzymeY} Etot (µM)` },
+  }, { displayModeBar: false, responsive: true });
+}
+
+/* 3、4 個酵素時，把「第 3 個酵素」(＋「第 4 個酵素」如果有) 每一種取值組合各自
+   的熱力圖，用 Plotly 的 subplot grid 一次全部排出來（small multiples），不用
+   下拉選單一張張切。4 個酵素時：欄＝第 3 個酵素的取值，列＝第 4 個酵素的取值。
+   全部小圖共用同一個色階範圍（取所有切片的最小/最大值），這樣顏色深淺在不同
+   小圖之間才能直接比較，不會因為各自獨立縮放而失真。 */
+function renderSmallMultipleHeatmaps(containerId, data, zKey, colorscale, colorbarTitle, baseTitle) {
+  const enzymes = data.enzymes;
+  const dim2Enzyme = enzymes[2];
+  const dim3Enzyme = enzymes.length === 4 ? enzymes[3] : null;
+  const dim2Vals = data.values_list[2];
+  const dim3Vals = dim3Enzyme ? data.values_list[3] : [null];
+
+  const cols = dim2Vals.length;
+  const rows = dim3Vals.length;
+
+  const cells = [];
+  let globalMin = Infinity;
+  let globalMax = -Infinity;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const sliceIndices = dim3Enzyme ? [c, r] : [c];
+      const { xVals, yVals, zFinal, zFlux } = extractScan2dSlice(data, sliceIndices);
+      const z = zKey === "zFinal" ? zFinal : zFlux;
+      z.forEach((row) => row.forEach((v) => {
+        if (v < globalMin) globalMin = v;
+        if (v > globalMax) globalMax = v;
+      }));
+      cells.push({ r, c, xVals, yVals, z });
+    }
+  }
+
+  const traces = [];
+  const annotations = [];
+  cells.forEach(({ r, c, xVals, yVals, z }) => {
+    const idx = r * cols + c + 1; // Plotly subplot 編號從 1 開始，row-major
+    const axisSuffix = idx === 1 ? "" : String(idx);
+    traces.push({
+      type: "heatmap",
+      x: xVals.map((v) => `${v}`),
+      y: yVals.map((v) => `${v}`),
+      z,
+      zmin: globalMin,
+      zmax: globalMax,
+      colorscale,
+      showscale: false,
+      xaxis: `x${axisSuffix}`,
+      yaxis: `y${axisSuffix}`,
+    });
+    const dim2Label = `${dim2Enzyme}=${fmt(dim2Vals[c], 2)}`;
+    const dim3Label = dim3Enzyme ? `, ${dim3Enzyme}=${fmt(dim3Vals[r], 2)}` : "";
+    annotations.push({
+      text: dim2Label + dim3Label,
+      showarrow: false,
+      xref: `x${axisSuffix} domain`,
+      yref: `y${axisSuffix} domain`,
+      x: 0.5, y: 1.16,
+      font: { size: 10, color: chartTitleColor() },
+    });
+  });
+  // 只在最後一個小圖上顯示色階，全部小圖共用，不用每格都重複一個 colorbar。
+  if (traces.length) {
+    traces[traces.length - 1].showscale = true;
+    traces[traces.length - 1].colorbar = { title: colorbarTitle, titleside: "right" };
+  }
+
+  Plotly.newPlot(containerId, traces, {
+    ...plotlyLayoutBase(),
+    title: { text: baseTitle, font: { size: 13, color: chartTitleColor() } },
+    grid: { rows, columns: cols, pattern: "independent", xgap: 0.10, ygap: 0.22 },
+    annotations,
+    height: Math.max(320, rows * 230 + 60),
+    margin: { t: 70, b: 40, l: 50, r: 60 },
+  }, { displayModeBar: false, responsive: true });
+}
+
+/* LHS／Sobol 取樣結果不是規則網格，沒辦法畫熱力圖——改成散佈圖：
+   X/Y 軸是 enzymes[0]/enzymes[1] 的實際取樣值，每個點的顏色深淺代表結果數值，
+   第 3、4 個酵素（如果有）的值放進滑鼠懸停文字裡，不額外做切片篩選（樣本點
+   本來就稀疏，篩選會讓能看的點更少）。 */
+function renderScan2dSampledCharts(data) {
+  const enzymeX = data.enzymes[0];
+  const enzymeY = data.enzymes[1];
+  els.scan2dSliceControls.innerHTML = "";
+  renderScanFixedSummary("scan2dSummaryLine", data.enzymes, data.params || readCommonParams());
+
+  const xs = data.results.map((r) => r.etot[enzymeX]);
+  const ys = data.results.map((r) => r.etot[enzymeY]);
+  const finalVals = data.results.map((r) => r.final_limonene_mM);
+  const fluxVals = data.results.map((r) => r.max_post_iptg_flux);
+  const hoverText = data.results.map((r) => {
+    const extra = data.enzymes.slice(2).map((e) => `${e}=${fmt(r.etot[e], 3)}`).join(", ");
+    return `${enzymeX}=${fmt(r.etot[enzymeX], 3)}, ${enzymeY}=${fmt(r.etot[enzymeY], 3)}` +
+      (extra ? `, ${extra}` : "");
+  });
+  const methodLabel = data.method === "lhs" ? t("scanStrategyLhs") : t("scanStrategySobol");
+
+  Plotly.newPlot("scan2dFinalHeatmap", [{
+    type: "scatter",
+    mode: "markers",
+    x: xs,
+    y: ys,
+    text: hoverText,
+    hovertemplate: "%{text}<br>final limonene: %{marker.color:.3f} mM<extra></extra>",
+    marker: {
+      size: 11,
+      color: finalVals,
+      colorscale: [[0, cssVar("--bg-panel")], [1, cssVar("--accent")]],
+      colorbar: { title: "mM", titleside: "right" },
+      line: { width: 1, color: cssVar("--border") },
+    },
+  }], {
+    ...plotlyLayoutBase(),
+    title: { text: t("scanSampledResultTitle", methodLabel), font: { size: 13, color: chartTitleColor() } },
+    xaxis: { ...plotlyLayoutBase().xaxis, title: `${enzymeX} Etot (µM)` },
+    yaxis: { ...plotlyLayoutBase().yaxis, title: `${enzymeY} Etot (µM)` },
+  }, { displayModeBar: false, responsive: true });
+
+  Plotly.newPlot("scan2dFluxHeatmap", [{
+    type: "scatter",
+    mode: "markers",
+    x: xs,
+    y: ys,
+    text: hoverText,
+    hovertemplate: "%{text}<br>max flux: %{marker.color:.4f} mmol/gDW/h<extra></extra>",
+    marker: {
+      size: 11,
+      color: fluxVals,
+      colorscale: [[0, cssVar("--bg-panel")], [1, cssVar("--leaf")]],
+      colorbar: { title: "mmol/gDW/h", titleside: "right" },
+      line: { width: 1, color: cssVar("--border") },
+    },
+  }], {
+    ...plotlyLayoutBase(),
+    title: { text: t("maxFluxLegend") + ` (${methodLabel})`, font: { size: 13, color: chartTitleColor() } },
     xaxis: { ...plotlyLayoutBase().xaxis, title: `${enzymeX} Etot (µM)` },
     yaxis: { ...plotlyLayoutBase().yaxis, title: `${enzymeY} Etot (µM)` },
   }, { displayModeBar: false, responsive: true });
@@ -2476,10 +3123,17 @@ function getCurrentParamSnapshot() {
     induced: document.getElementById("induced").value,
     scanEnzyme: document.getElementById("scanEnzyme").value,
     scanValues: document.getElementById("scanValues").value,
+    scanMultiCount: document.getElementById("scanMultiCount").value,
+    scanStrategy: document.getElementById("scanStrategy").value,
+    scanNSamples: document.getElementById("scanNSamples").value,
     scanEnzymeX: document.getElementById("scanEnzymeX").value,
     scanValuesX: document.getElementById("scanValuesX").value,
     scanEnzymeY: document.getElementById("scanEnzymeY").value,
     scanValuesY: document.getElementById("scanValuesY").value,
+    scanEnzymeZ: document.getElementById("scanEnzymeZ").value,
+    scanValuesZ: document.getElementById("scanValuesZ").value,
+    scanEnzymeW: document.getElementById("scanEnzymeW").value,
+    scanValuesW: document.getElementById("scanValuesW").value,
     glycerolUptake: document.getElementById("glycerolUptake").value,
     oxygenUptake: document.getElementById("oxygenUptake").value,
     aaUptake: document.getElementById("aaUptake").value,
@@ -2504,10 +3158,20 @@ function applyParamSnapshot(snap) {
   setIf("induced", snap.induced);
   setIf("scanEnzyme", snap.scanEnzyme);
   setIf("scanValues", snap.scanValues);
+  setIf("scanMultiCount", snap.scanMultiCount);
+  setIf("scanStrategy", snap.scanStrategy);
+  setIf("scanNSamples", snap.scanNSamples);
   setIf("scanEnzymeX", snap.scanEnzymeX);
   setIf("scanValuesX", snap.scanValuesX);
   setIf("scanEnzymeY", snap.scanEnzymeY);
   setIf("scanValuesY", snap.scanValuesY);
+  setIf("scanEnzymeZ", snap.scanEnzymeZ);
+  setIf("scanValuesZ", snap.scanValuesZ);
+  setIf("scanEnzymeW", snap.scanEnzymeW);
+  setIf("scanValuesW", snap.scanValuesW);
+  updateScanMultiFieldsVisibility();
+  updateScanStrategyUI();
+  updateScanEnzymeDisabledStates();
   setIf("glycerolUptake", snap.glycerolUptake);
   setIf("oxygenUptake", snap.oxygenUptake);
   setIf("aaUptake", snap.aaUptake);
@@ -2597,10 +3261,17 @@ function buildShareUrl() {
   params.set("induced", snap.induced);
   params.set("se", snap.scanEnzyme);
   params.set("sv", snap.scanValues);
+  params.set("smc", snap.scanMultiCount);
+  params.set("sst", snap.scanStrategy);
+  params.set("sns", snap.scanNSamples);
   params.set("sex", snap.scanEnzymeX);
   params.set("svx", snap.scanValuesX);
   params.set("sey", snap.scanEnzymeY);
   params.set("svy", snap.scanValuesY);
+  params.set("sez", snap.scanEnzymeZ);
+  params.set("svz", snap.scanValuesZ);
+  params.set("sew", snap.scanEnzymeW);
+  params.set("svw", snap.scanValuesW);
   params.set("glyc", snap.glycerolUptake);
   params.set("o2", snap.oxygenUptake);
   params.set("aa", snap.aaUptake);
@@ -2635,10 +3306,17 @@ function applyUrlParams() {
     induced: params.get("induced") || undefined,
     scanEnzyme: params.get("se") || undefined,
     scanValues: params.get("sv") || undefined,
+    scanMultiCount: params.get("smc") || undefined,
+    scanStrategy: params.get("sst") || undefined,
+    scanNSamples: params.get("sns") || undefined,
     scanEnzymeX: params.get("sex") || undefined,
     scanValuesX: params.get("svx") || undefined,
     scanEnzymeY: params.get("sey") || undefined,
     scanValuesY: params.get("svy") || undefined,
+    scanEnzymeZ: params.get("sez") || undefined,
+    scanValuesZ: params.get("svz") || undefined,
+    scanEnzymeW: params.get("sew") || undefined,
+    scanValuesW: params.get("svw") || undefined,
     glycerolUptake: params.get("glyc") || undefined,
     oxygenUptake: params.get("o2") || undefined,
     aaUptake: params.get("aa") || undefined,
@@ -2692,7 +3370,8 @@ function downloadCsv(filename, csvContent) {
 }
 
 function exportCsv(mode) {
-  const data = state.lastResults[mode];
+  const data = (mode === "scan" && state.scanDisplayMode === "all")
+    ? state.lastResults.scanAll : state.lastResults[mode];
   if (!data) { flashHint(t("exportNoData"), true); return; }
 
   let csv, filename;
@@ -2722,17 +3401,54 @@ function exportCsv(mode) {
     csv = rowsToCsv(headers, rows);
     filename = "dfba_result.csv";
   } else if (mode === "scan") {
-    const headers = ["etot_uM", "final_limonene_mM", "max_post_iptg_flux"];
-    const rows = data.results.map((r) => [r.etot_uM, r.final_limonene_mM, r.max_post_iptg_flux]);
-    csv = rowsToCsv(headers, rows);
-    filename = `scan_${data.enzyme}_result.csv`;
+    if (data.enzymes) {
+      // 四個酵素疊圖比較模式：攤平成一份完整表格，每列多一欄標示是哪個酵素。
+      const headers = ["enzyme", "etot_uM", "etot_factor", "final_limonene_mM", "max_post_iptg_flux",
+        "mean_post_induction_flux_mmol_gDW_h", "max_volumetric_rate_mM_h", "peak_capacity_utilization"];
+      const rows = [];
+      for (const enzyme of data.enzymes) {
+        for (const r of data.allResults[enzyme]) {
+          rows.push([enzyme, r.etot_uM, r.etot_factor, r.final_limonene_mM, r.max_post_iptg_flux,
+            r.mean_post_induction_flux_mmol_gDW_h, r.max_volumetric_rate_mM_h, r.peak_capacity_utilization]);
+        }
+      }
+      csv = rowsToCsv(headers, rows);
+      filename = "scan_all_enzymes_result.csv";
+    } else {
+      const headers = ["etot_uM", "etot_factor", "final_limonene_mM", "max_post_iptg_flux",
+        "mean_post_induction_flux_mmol_gDW_h", "max_volumetric_rate_mM_h", "peak_capacity_utilization"];
+      const rows = data.results.map((r) => [
+        r.etot_uM, r.etot_factor, r.final_limonene_mM, r.max_post_iptg_flux,
+        r.mean_post_induction_flux_mmol_gDW_h, r.max_volumetric_rate_mM_h, r.peak_capacity_utilization,
+      ]);
+      csv = rowsToCsv(headers, rows);
+      filename = `scan_${data.enzyme}_result.csv`;
+    }
   } else if (mode === "scan2d") {
-    const headers = [`${data.enzyme_y}\\${data.enzyme_x}`, ...data.values_x.map(String)];
-    const finalRows = data.values_y.map((y, i) => [y, ...data.final_limonene_mM[i]]);
-    const fluxRows = data.values_y.map((y, i) => [y, ...data.max_post_iptg_flux[i]]);
-    csv = "final_limonene_mM\n" + rowsToCsv(headers, finalRows) +
-      "\n\nmax_post_iptg_flux\n" + rowsToCsv(headers, fluxRows);
-    filename = `scan2d_${data.enzyme_x}_${data.enzyme_y}_result.csv`;
+    const headers = [...data.enzymes.map((e) => `${e}_Etot_uM`), "final_limonene_mM", "max_post_iptg_flux"];
+    let rows;
+    if (data.method) {
+      // 取樣結果本來就是攤平的列表，直接轉成 CSV 列。
+      rows = data.results.map((r) => [
+        ...data.enzymes.map((e) => r.etot[e]), r.final_limonene_mM, r.max_post_iptg_flux,
+      ]);
+    } else {
+      // 窮舉網格是巢狀結構，CSV 匯出完整的 N 維資料（不像表格只顯示目前切片）。
+      rows = [];
+      const walk = (idxPath, nodeFinal, nodeFlux) => {
+        if (idxPath.length === data.enzymes.length) {
+          const etotVals = idxPath.map((idx, dim) => data.values_list[dim][idx]);
+          rows.push([...etotVals, nodeFinal, nodeFlux]);
+          return;
+        }
+        for (let i = 0; i < nodeFinal.length; i++) {
+          walk([...idxPath, i], nodeFinal[i], nodeFlux[i]);
+        }
+      };
+      walk([], data.final_limonene_mM, data.max_post_iptg_flux);
+    }
+    csv = rowsToCsv(headers, rows);
+    filename = `scan_multi_${data.enzymes.join("_")}_result.csv`;
   } else if (mode === "optimize") {
     const headers = ["eval", "DXS", "IDI", "GPPS", "LS", "limonene_flux_mmol_gDW_h"];
     const rows = (data.history || []).map((h, i) => [
