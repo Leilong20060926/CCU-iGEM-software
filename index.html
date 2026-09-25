@@ -566,6 +566,19 @@ html, body {
 }
 .hint--error { color: var(--danger); }
 
+.banner {
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+.banner--warning {
+  background: color-mix(in srgb, var(--danger) 14%, var(--bg-panel-raised));
+  border: 1px solid var(--danger);
+  color: var(--text);
+}
+
 /* ---------- Results ---------- */
 .panel--results { min-height: 520px; }
 
@@ -743,6 +756,7 @@ html, body {
           <select id="scanSubMode">
             <option value="manual" data-i18n="scanSubModeManual">手動掃描（指定範圍）</option>
             <option value="optimize" data-i18n="scanSubModeOptimize">自動最佳化（Nelder-Mead）</option>
+            <option value="surrogate" data-i18n="scanSubModeSurrogate">快速估計（外部代理模型）</option>
           </select>
         </div>
         <div id="scanManualFields">
@@ -767,6 +781,12 @@ html, body {
             <input type="number" id="optimizeMaxIter" step="10" min="50" max="600" value="200">
           </div>
           <p class="hint" data-i18n="optimizeHint">從目前 Etot 欄位的數值開始搜尋，用穩態 FBA（非 dFBA）當目標函數，找出讓限烯烴通量最大化的 Etot(DXS/IDI/GPPS/LS) 組合。次數越多越準，但也越慢。</p>
+        </div>
+        <div id="scanSurrogateFields" hidden>
+          <div class="banner banner--warning" data-i18n="surrogateWarning">
+            這個結果不是本工具即時跑 COBRA 算出來的，是另一條外部流程宣稱用 MATLAB 對同一份模型做過完整 Etot 掃描後擬合出的方程式估計值。已實際重新載入模型交叉核對：這批結果用的是 BIOMASS_Ec_iJO1366_core_53p95M，跟本工具其他計算（FBA／dFBA／Etot 分析）依團隊決定固定使用的 BIOMASS_Ec_iJO1366_WT_53p95M 不是同一個假設——在這個簡化培養基下 _WT_ 生長速率會是 0（缺 B12 輔酶與 colipa_e 兩個前驅物），所以這裡的數字不能直接跟本工具其他結果比較或加總。
+          </div>
+          <p class="hint" data-i18n="surrogateUsesSharedEtot">直接使用左上方「酵素總濃度 Etot」欄位目前填的四個數值（DXS/IDI/GPPS/LS），跟其他分頁共用同一組輸入，不用另外填。注意這裡的可用範圍比較窄：DXS/IDI/GPPS 是 0.001–1000 µM，LS 是 0.003–30000 µM，超出範圍會直接報錯。</p>
         </div>
       </div>
 
@@ -1045,6 +1065,33 @@ html, body {
         </details>
       </div>
 
+      <div id="surrogateResults" class="result-block" hidden>
+        <div class="banner banner--warning" data-i18n="surrogateWarning">
+          這個結果不是本工具即時跑 COBRA 算出來的，是另一條外部流程宣稱用 MATLAB 對同一份模型做過完整 Etot 掃描後擬合出的方程式估計值。本工具沒有獨立重跑驗證過這批數字的真實性，請跟「Etot 分析」（即時 COBRA 計算）交叉比對後再採信。
+        </div>
+        <div class="metric-row">
+          <div class="metric">
+            <span class="metric__label" data-i18n="surrogateLimoneneLabel">估計累積限烯烴濃度</span>
+            <span class="metric__value metric__value--accent" id="mSurrogateLimonene">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric__label" data-i18n="surrogateTerminationLabel">終止分類</span>
+            <span class="metric__value" id="mSurrogateTermination">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric__label" data-i18n="surrogateEndpointLabel">推估結束時間</span>
+            <span class="metric__value" id="mSurrogateEndpoint">—</span>
+          </div>
+        </div>
+        <p class="summary-line" id="surrogateSummaryLine"></p>
+        <div id="surrogateCurveChart" class="chart"></div>
+
+        <details class="report-details">
+          <summary data-i18n="rawDataToggle">顯示原始數據表格</summary>
+          <div class="data-table-wrap" id="surrogateDataTable"></div>
+        </details>
+      </div>
+
     </section>
   </main>
   </div>
@@ -1158,13 +1205,27 @@ const I18N = {
     modeFbaDesc: "單一時間點穩態通量",
     modeDfbaDesc: "誘導後動態時間序列",
     modeScanLabel: "Etot 分析",
-    modeScanDesc: "單酵素掃描／自動最佳化",
+    modeScanDesc: "單酵素掃描／自動最佳化／快速估計",
     modeScan2dLabel: "多酵素掃描",
     modeScan2dDesc: "2~4 酵素交叉掃描",
+    runSurrogate: "查詢快速估計",
+    surrogateWarning: "這個結果不是本工具即時跑 COBRA 算出來的，是另一條外部流程宣稱用 MATLAB 對同一份模型做過完整 Etot 掃描後擬合出的方程式估計值。已實際重新載入模型交叉核對：這批結果用的是 BIOMASS_Ec_iJO1366_core_53p95M，跟本工具其他計算（FBA／dFBA／Etot 分析）依團隊決定固定使用的 BIOMASS_Ec_iJO1366_WT_53p95M 不是同一個假設——在這個簡化培養基下 _WT_ 生長速率會是 0（缺 B12 輔酶與 colipa_e 兩個前驅物），所以這裡的數字不能直接跟本工具其他結果比較或加總。",
+    surrogateUsesSharedEtot: "直接使用左上方「酵素總濃度 Etot」欄位目前填的四個數值（DXS/IDI/GPPS/LS），跟其他分頁共用同一組輸入，不用另外填。注意這裡的可用範圍比較窄：DXS/IDI/GPPS 是 0.001–1000 µM，LS 是 0.003–30000 µM，超出範圍會直接報錯。",
+    surrogateLimoneneLabel: "估計累積限烯烴濃度",
+    surrogateTerminationLabel: "終止分類",
+    surrogateEndpointLabel: "推估結束時間",
+    surrogateTerminationHorizon: "完整跑滿模擬時長",
+    surrogateTerminationInfeasible: "推估提前不可行（非 25h 產量）",
+    surrogateTerminationUncertain: "落在未解邊界區間，分類不確定",
+    surrogateSummaryPrefix: "誘導時間固定 ",
+    surrogateCurveTitle: "LS Etot 響應曲線（外部代理模型）",
+    surrogateCurveLegend: "整條 LS 響應曲線",
+    surrogateCurrentQueryLegend: "目前查詢的 LS 值",
     runOptimize: "執行自動最佳化",
     scanSubModeLabel: "分析方式",
     scanSubModeManual: "手動掃描（指定範圍）",
     scanSubModeOptimize: "自動最佳化（Nelder-Mead）",
+    scanSubModeSurrogate: "快速估計（外部代理模型）",
     optimizeMaxIterLabel: "最大迭代次數",
     optimizeHint: "從目前 Etot 欄位的數值開始搜尋，用穩態 FBA（非 dFBA）當目標函數，找出讓限烯烴通量最大化的 Etot(DXS/IDI/GPPS/LS) 組合。次數越多越準，但也越慢。",
     optimizeBestFluxLabel: "最佳限烯烴通量",
@@ -1366,13 +1427,27 @@ const I18N = {
     modeFbaDesc: "Single time-point steady-state flux",
     modeDfbaDesc: "Post-induction dynamic time series",
     modeScanLabel: "Etot Analysis",
-    modeScanDesc: "Manual scan / auto-optimize",
+    modeScanDesc: "Manual scan / auto-optimize / quick estimate",
     modeScan2dLabel: "Multi-Enzyme Scan",
     modeScan2dDesc: "2-4 enzyme cross-scan",
+    runSurrogate: "Query quick estimate",
+    surrogateWarning: "This result is not computed live by this tool's own COBRA pipeline. It comes from a separate, external workflow that claims to have run a full MATLAB Etot scan of the same model and fitted the results into an equation. We independently reloaded the model to cross-check: this result set uses BIOMASS_Ec_iJO1366_core_53p95M, not the BIOMASS_Ec_iJO1366_WT_53p95M this tool's other computations (FBA/dFBA/Etot Analysis) use per your team's decision — under this simplified medium, _WT_ growth is confirmed to be 0 (missing the B12 cofactor and colipa_e precursors), so these numbers should not be directly compared with or combined with this tool's other results.",
+    surrogateUsesSharedEtot: "Uses the four values currently in the \"Etot\" fields above (DXS/IDI/GPPS/LS), shared with the other tabs — no need to enter them again here. Note the usable range here is narrower: DXS/IDI/GPPS are 0.001–1000 µM, LS is 0.003–30000 µM; anything outside that range is rejected.",
+    surrogateLimoneneLabel: "Estimated cumulative limonene",
+    surrogateTerminationLabel: "Termination classification",
+    surrogateEndpointLabel: "Estimated endpoint time",
+    surrogateTerminationHorizon: "Completed the full simulated duration",
+    surrogateTerminationInfeasible: "Estimated early infeasibility (not a 25h yield)",
+    surrogateTerminationUncertain: "Falls in an unresolved boundary bracket; classification uncertain",
+    surrogateSummaryPrefix: "Induction time fixed at ",
+    surrogateCurveTitle: "LS Etot response curve (external surrogate model)",
+    surrogateCurveLegend: "Full LS response curve",
+    surrogateCurrentQueryLegend: "Current queried LS",
     runOptimize: "Run auto-optimize",
     scanSubModeLabel: "Analysis mode",
     scanSubModeManual: "Manual scan (specify range)",
     scanSubModeOptimize: "Auto-optimize (Nelder-Mead)",
+    scanSubModeSurrogate: "Quick estimate (external surrogate model)",
     optimizeMaxIterLabel: "Max iterations",
     optimizeHint: "Starts from the current Etot field values and uses steady-state FBA (not dFBA) as the objective function, searching for the Etot(DXS/IDI/GPPS/LS) combination that maximizes limonene flux. More iterations = more accurate but slower.",
     optimizeBestFluxLabel: "Best limonene flux",
@@ -1611,6 +1686,7 @@ const els = {
   statusHint: document.getElementById("statusHint"),
   scanFieldGroup: document.getElementById("scanFieldGroup"),
   scan2dFieldGroup: document.getElementById("scan2dFieldGroup"),
+  scanSurrogateFields: document.getElementById("scanSurrogateFields"),
   scanNSamplesField: document.getElementById("scanNSamplesField"),
   scanEnzymeZField: document.getElementById("scanEnzymeZField"),
   scanValuesZField: document.getElementById("scanValuesZField"),
@@ -1634,14 +1710,16 @@ const els = {
 };
 
 function modeConfig() {
+  const scanResultBlocks = { manual: "scanResults", optimize: "optimizeResults", surrogate: "surrogateResults" };
+  const scanLabels = { manual: t("runScan"), optimize: t("runOptimize"), surrogate: t("runSurrogate") };
   return {
     fba: { label: t("runFba"), resultBlock: "fbaResults" },
     dfba: { label: t("runDfba"), resultBlock: "dfbaResults" },
-    // scan 現在涵蓋「手動掃描」跟「自動最佳化」兩種子模式，用哪個結果區塊、
-    // 執行按鈕文字，要看 state.scanSubMode 現在是哪一個。
+    // scan 現在涵蓋「手動掃描」「自動最佳化」「快速估計」三種子模式，用哪個
+    // 結果區塊、執行按鈕文字，要看 state.scanSubMode 現在是哪一個。
     scan: {
-      label: state.scanSubMode === "optimize" ? t("runOptimize") : t("runScan"),
-      resultBlock: state.scanSubMode === "optimize" ? "optimizeResults" : "scanResults",
+      label: scanLabels[state.scanSubMode] || scanLabels.manual,
+      resultBlock: scanResultBlocks[state.scanSubMode] || scanResultBlocks.manual,
     },
     scan2d: { label: t("runScan2d"), resultBlock: "scan2dResults" },
   };
@@ -1809,6 +1887,9 @@ function rerenderAllResults() {
   }
   if (state.lastResults.scan2d) renderScan2dCharts(state.lastResults.scan2d);
   if (state.lastResults.optimize) renderOptimizeResults(state.lastResults.optimize);
+  if (state.lastResults.surrogate) {
+    renderSurrogateResults(state.lastResults.surrogate, state.lastResults.surrogateCurve, state.lastResults.surrogateLS);
+  }
 }
 
 function setStatus(kind, text) {
@@ -1944,21 +2025,26 @@ function updateModeUI() {
   const cfg = modeConfig()[state.mode];
   els.runBtnLabel.textContent = cfg.label;
 
-  const isOptimize = state.mode === "scan" && state.scanSubMode === "optimize";
-  els.scanFieldGroup.hidden = state.mode !== "scan";
+  const isScan = state.mode === "scan";
+  const isOptimize = isScan && state.scanSubMode === "optimize";
+  const isSurrogate = isScan && state.scanSubMode === "surrogate";
+  els.scanFieldGroup.hidden = !isScan;
   els.scan2dFieldGroup.hidden = state.mode !== "scan2d";
-  els.scanManualFields.hidden = state.mode === "scan" && isOptimize;
-  els.scanOptimizeFields.hidden = !(state.mode === "scan" && isOptimize);
+  els.scanManualFields.hidden = isScan && (isOptimize || isSurrogate);
+  els.scanOptimizeFields.hidden = !isOptimize;
+  els.scanSurrogateFields.hidden = !isSurrogate;
   els.inducedField.hidden = state.mode !== "fba";
-  els.durationField.hidden = state.mode === "fba" || isOptimize;
+  els.durationField.hidden = state.mode === "fba" || isOptimize || isSurrogate;
   // step_mode 只有內部真的會跑 dFBA 引擎的模式才有意義：dFBA 本身、以及
-  // Etot 掃描／2D 掃描（每個網格點內部其實也是各跑一次 dFBA）；自動最佳化
-  // 子模式底層是穩態 FBA，不是 dFBA，這裡也要排除。
-  els.stepModeField.hidden = isOptimize || !["dfba", "scan", "scan2d"].includes(state.mode);
+  // Etot 掃描／2D 掃描（每個網格點內部其實也是各跑一次 dFBA）；自動最佳化跟
+  // 快速估計這兩個子模式底層都不是 dFBA（分別是穩態 FBA、外部代理模型），
+  // 這裡都要排除。
+  els.stepModeField.hidden = isOptimize || isSurrogate
+    || !["dfba", "scan", "scan2d"].includes(state.mode);
   els.compareField.hidden = state.mode !== "dfba";
   els.compareClearRow.hidden = state.mode !== "dfba" || state.dfbaHistory.length === 0;
 
-  for (const key of ["fbaResults", "dfbaResults", "scanResults", "scan2dResults", "optimizeResults"]) {
+  for (const key of ["fbaResults", "dfbaResults", "scanResults", "scan2dResults", "optimizeResults", "surrogateResults"]) {
     document.getElementById(key).hidden = key !== cfg.resultBlock;
   }
   if (state.mode === "scan2d") updateScanMultiFieldsVisibility();
@@ -2004,6 +2090,7 @@ async function runCurrentMode() {
     else if (state.mode === "dfba") await runDfba();
     else if (state.mode === "scan") {
       if (state.scanSubMode === "optimize") await runOptimize();
+      else if (state.scanSubMode === "surrogate") await runSurrogate();
       else await runScan();
     } else await runScan2d();
     els.statusHint.textContent = t("done");
@@ -3016,6 +3103,87 @@ function renderScan2dSampledCharts(data) {
   }, { displayModeBar: false, responsive: true });
 
   renderDataTable("scan2d", data);
+}
+
+/* ---------------- Etot 快速估計（外部代理模型，非即時 COBRA） ---------------- */
+async function runSurrogate() {
+  // 直接用共用的「酵素總濃度 Etot」欄位（readEtot()），不再另外開一套獨立輸入框，
+  // 這樣所有分頁看到的 Etot 都是同一組數字，不會改了這裡、那裡卻沒跟著變。
+  const etot = readEtot();
+  const [data, curve] = await Promise.all([
+    postJson("/api/etot-surrogate", { etot }),
+    postJson("/api/etot-surrogate-curve", { etot: { DXS: etot.DXS, IDI: etot.IDI, GPPS: etot.GPPS }, n_points: 150 }),
+  ]);
+  state.lastResults.surrogate = data;
+  state.lastResults.surrogateCurve = curve;
+  state.lastResults.surrogateLS = etot.LS;
+  renderSurrogateResults(data, curve, etot.LS);
+}
+
+/* 代理模型本質上是「輸入 LS Etot、吐出一個限烯烴預測值」的分段三次方程式，
+   DXS/IDI/GPPS 不影響實際輸出值（只影響範圍檢查）——所以最有意義的圖表是整條
+   LS 響應曲線（log-log），不是單一個點。目前查詢的那組 LS 用一個標記點凸顯出來，
+   1000–1250 µM 這種「終止分類不確定」的區間用半透明色塊標出來，呼應參考圖裡
+   的 hatched band 概念。 */
+function renderSurrogateCurveChart(curve, currentLS) {
+  const points = curve.points;
+  const shapes = (curve.termination_brackets_uM || []).map(([lo, hi]) => ({
+    type: "rect", xref: "x", yref: "paper",
+    x0: lo, x1: hi, y0: 0, y1: 1,
+    fillcolor: accentColors()[3], opacity: 0.15, line: { width: 0 },
+  }));
+
+  const currentPoint = points.reduce((closest, p) =>
+    Math.abs(p.LS_uM - currentLS) < Math.abs(closest.LS_uM - currentLS) ? p : closest, points[0]);
+
+  Plotly.newPlot("surrogateCurveChart", [
+    {
+      x: points.map((p) => p.LS_uM),
+      y: points.map((p) => p.limonene_mM),
+      type: "scatter", mode: "lines",
+      line: { color: accentColors()[0], width: 2 },
+      name: t("surrogateCurveLegend"),
+      hovertemplate: "LS=%{x:.4g} µM<br>%{y:.4g} mM<extra></extra>",
+    },
+    {
+      x: [currentPoint.LS_uM], y: [currentPoint.limonene_mM],
+      type: "scatter", mode: "markers",
+      marker: { color: accentColors()[3], size: 12, symbol: "diamond" },
+      name: t("surrogateCurrentQueryLegend"),
+      hovertemplate: "LS=%{x:.4g} µM<br>%{y:.4g} mM<extra></extra>",
+    },
+  ], {
+    ...plotlyLayoutBase(),
+    title: { text: t("surrogateCurveTitle"), font: { size: 13, color: chartTitleColor() } },
+    xaxis: { ...plotlyLayoutBase().xaxis, title: "LS Etot (µM)", type: "log" },
+    yaxis: { ...plotlyLayoutBase().yaxis, title: "mM", type: "log" },
+    shapes,
+    showlegend: true,
+  }, { displayModeBar: false, responsive: true });
+}
+
+function renderSurrogateResults(data, curve, currentLS) {
+  document.getElementById("mSurrogateLimonene").textContent =
+    `${fmt(data.limonene_mM, 4)} mM`;
+
+  const terminationKey = {
+    horizon: "surrogateTerminationHorizon",
+    model_infeasible_before_25h: "surrogateTerminationInfeasible",
+    boundary_uncertain: "surrogateTerminationUncertain",
+  }[data.termination] || data.termination;
+  document.getElementById("mSurrogateTermination").textContent = t(terminationKey);
+
+  document.getElementById("mSurrogateEndpoint").textContent =
+    data.endpoint_time_h != null ? `${fmt(data.endpoint_time_h, 2)} h` : "—";
+
+  document.getElementById("surrogateSummaryLine").textContent =
+    `${t("surrogateSummaryPrefix")}${fmt(data.induction_h, 2)} h`;
+
+  if (curve) renderSurrogateCurveChart(curve, currentLS);
+
+  const rows = Object.entries(data).map(([k, v]) => [k, JSON.stringify(v)]);
+  document.getElementById("surrogateDataTable").innerHTML =
+    buildTableHtml([t("rawDataMetricCol"), t("rawDataValueCol")], rows);
 }
 
 /* ---------------- 自動最佳化 Etot（Nelder-Mead） ---------------- */

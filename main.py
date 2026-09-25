@@ -14,6 +14,12 @@ LimoneneCOBRA FBA / dFBA 網頁後端（單檔版）。
     index.html                         前端網頁
     models/iEC1356_Bl21DE3.mat         COBRA Toolbox 菌株模型（需自行放入）
 
+選用（缺少也不影響其他功能，只有「Etot 快速估計」這個分頁會回 503）：
+    limonene_predictor.py              外部代理模型的查詢程式（標準函式庫，無額外依賴）
+    limonene_model.json                外部代理模型的係數與元資料
+    這兩個檔案來自一條跟本工具完全獨立的外部 MATLAB 掃描流程，本工具沒有獨立
+    驗證過其中數字是否真的來自實際 MATLAB 執行——部署前建議自行抽樣核對。
+
 加速：
     pip install highspy
     → 裝了就會自動改用 HiGHS 這個 LP solver（比 cobrapy 預設的 GLPK 快很多倍），
@@ -1219,6 +1225,130 @@ app = Flask(__name__, static_folder=ASSETS_DIR, static_url_path="/assets")
 
 _registry = None
 _base_model = None
+
+# ============================================================
+# Etot 代理模型（外部 MATLAB dFBA 掃描擬合出的分段三次方程式）
+# ============================================================
+# 這一整套（limonene_predictor.py + limonene_model.json）不是我們自己這個
+# Python/COBRA 工具跑出來的結果，是另一條完全獨立的流程宣稱用真實 MATLAB +
+# COBRA Toolbox 對同一份 V9 模型做窮盡的自適應 Etot 掃描，再把「DXS/IDI/GPPS
+# 在給定範圍內對最佳解沒有影響（有結構證書支持）＋LS 是唯一有效變因」這個
+# 結論，壓縮成一個只吃 LS 的分段三次方程式。優點很明顯：網站端不用再即時跑
+# COBRA、不用載入龐大的四維查表資料，一次查詢是毫秒等級的純數學運算。
+#
+# 但這批數字的真正來源（是否真的執行過 MATLAB、還是由 AI 生成了一整套內部
+# 自洽但實際沒跑過的產物）沒有辦法只靠檔案本身驗證——內部一致（雜湊、單元
+# 測試、驗證報告都對得上）不等於數字是真的。這個 endpoint 因此刻意跟現有的
+# COBRA 計算路徑完全分開、不互相取代：/api/fba、/api/dfba、/api/etot-scan
+# 這些照舊即時算，是我們自己逐輪驗證過的；這裡只是額外提供一個「外部宣稱的
+# 快速估計」，前端會清楚標示來源跟這個警告，讓使用者自己判斷要不要採信、
+# 或者拿去跟即時 COBRA 結果交叉比對。
+_etot_surrogate = None
+_etot_surrogate_error = None
+
+
+def get_etot_surrogate():
+    global _etot_surrogate, _etot_surrogate_error
+    if _etot_surrogate is None and _etot_surrogate_error is None:
+        try:
+            from limonene_predictor import LimonenePredictor
+            model_path = os.environ.get(
+                "LIMONENE_SURROGATE_MODEL", os.path.join(BASE_DIR, "limonene_model.json"))
+            _etot_surrogate = LimonenePredictor.load(model_path)
+        except Exception as exc:
+            _etot_surrogate_error = str(exc)
+    return _etot_surrogate, _etot_surrogate_error
+
+
+@app.route("/api/etot-surrogate", methods=["POST"])
+def etot_surrogate_endpoint():
+    """外部 MATLAB 掃描代理模型的快速估計（見上方模組說明）。跟 /api/fba 等
+    即時 COBRA 計算完全獨立，回傳內容一定帶 provenance 欄位清楚標示來源與
+    未經本工具驗證這件事，前端不可以省略顯示這個欄位。"""
+    predictor, load_error = get_etot_surrogate()
+    if predictor is None:
+        return jsonify({
+            "error": f"代理模型載入失敗：{load_error}",
+            "provenance": "external_matlab_scan_surrogate_unverified_by_this_tool",
+        }), 503
+
+    body = request.get_json(force=True, silent=True) or {}
+    etot = body.get("etot") or {}
+    try:
+        values = {k: float(etot.get(k)) for k in ("DXS", "IDI", "GPPS", "LS")}
+    except (TypeError, ValueError):
+        return jsonify({"error": "請提供 DXS/IDI/GPPS/LS 四個數值（µM）"}), 400
+
+    try:
+        result = predictor.predict(values)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    result["provenance"] = "external_matlab_scan_surrogate_biomass_mismatch_confirmed"
+    result["provenance_note"] = (
+        "這個結果不是本工具即時跑 COBRA 算出來的，是另一條外部流程宣稱用 MATLAB "
+        "對同一份模型做過完整 Etot 掃描後擬合出的方程式估計值。已經實際重新載入 "
+        "modelDyn.mat 交叉核對過：這批外部結果用的目標函數是 "
+        "BIOMASS_Ec_iJO1366_core_53p95M，跟本工具其他所有計算（FBA／dFBA／Etot "
+        "掃描）依團隊決定固定使用的 BIOMASS_Ec_iJO1366_WT_53p95M 不是同一個假設。"
+        "已確認在這個代理模型使用的簡化培養基下，_WT_ 生長速率會是 0（缺 "
+        "adenosylcobalamin 與 colipa_e 兩個前驅物，不是單純漏開某個交換反應就能"
+        "解決），所以這裡的數字不能直接拿來跟本工具其他結果比較或加總。"
+    )
+    return jsonify(result)
+
+
+@app.route("/api/etot-surrogate-curve", methods=["POST"])
+def etot_surrogate_curve_endpoint():
+    """代理模型本質上是「輸入 LS Etot、吐出一個限烯烴預測值」的分段三次方程式
+    （DXS/IDI/GPPS 只影響範圍檢查，不影響實際輸出值——見 equations.md），這裡
+    把整條 LS 響應曲線一次算出來，讓前端可以畫成 log-log 圖。因為是純數學運算，
+    不用跑 COBRA，取樣點數可以拉很高也很快（毫秒等級），預設 150 點。"""
+    predictor, load_error = get_etot_surrogate()
+    if predictor is None:
+        return jsonify({
+            "error": f"代理模型載入失敗：{load_error}",
+            "provenance": "external_matlab_scan_surrogate_biomass_mismatch_confirmed",
+        }), 503
+
+    body = request.get_json(force=True, silent=True) or {}
+    etot = body.get("etot") or {}
+    try:
+        fixed = {k: float(etot.get(k)) for k in ("DXS", "IDI", "GPPS")}
+    except (TypeError, ValueError):
+        return jsonify({"error": "請提供 DXS/IDI/GPPS 三個數值（µM）"}), 400
+
+    n_points = int(body.get("n_points", 150))
+    n_points = max(20, min(n_points, 500))
+
+    ls_lo, ls_hi = predictor.domain["LS"]
+    log_lo, log_hi = math.log10(ls_lo), math.log10(ls_hi)
+    ls_values = [
+        10 ** (log_lo + (log_hi - log_lo) * i / (n_points - 1))
+        for i in range(n_points)
+    ]
+    # 頭尾用精確邊界值，避免浮點誤差讓最後一點落在範圍外被 predictor 拒絕。
+    ls_values[0], ls_values[-1] = ls_lo, ls_hi
+
+    points = []
+    for ls in ls_values:
+        try:
+            result = predictor.predict({**fixed, "LS": ls})
+            points.append({
+                "LS_uM": ls,
+                "limonene_mM": result["limonene_mM"],
+                "termination": result["termination"],
+            })
+        except ValueError:
+            continue
+
+    return jsonify({
+        "points": points,
+        "termination_brackets_uM": predictor.termination_brackets,
+        "domain_uM": predictor.domain,
+        "fixed_etot": fixed,
+        "provenance": "external_matlab_scan_surrogate_biomass_mismatch_confirmed",
+    })
 
 
 def get_registry():

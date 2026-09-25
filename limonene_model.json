@@ -1,0 +1,292 @@
+{
+  "schema_version": 3,
+  "model_kind": "four_input_LS_piecewise_cubic",
+  "domain_uM": {
+    "DXS": [
+      0.001,
+      1000
+    ],
+    "IDI": [
+      0.001,
+      1000
+    ],
+    "GPPS": [
+      0.001,
+      1000
+    ],
+    "LS": [
+      0.003,
+      30000
+    ]
+  },
+  "metric": "cumulative_limonene_until_min_25h_or_first_model_infeasibility",
+  "termination_rules": [
+    {
+      "termination": "horizon",
+      "LS_range_uM": [
+        0.003,
+        1000
+      ],
+      "observed_terminal_time_h_range": [
+        25,
+        25
+      ]
+    },
+    {
+      "termination": "infeasible",
+      "LS_range_uM": [
+        1250,
+        30000
+      ],
+      "observed_terminal_time_h_range": [
+        9,
+        24.5
+      ]
+    }
+  ],
+  "termination_brackets_uM": [
+    [
+      1000,
+      1250
+    ]
+  ],
+  "log10_LS_knots": [
+    -2.5228787452803374,
+    -2.0222763947111524,
+    -1.5228787452803376,
+    -1.0222763947111522,
+    -0.5228787452803376,
+    -0.022276394711152253,
+    0.47712125471966244,
+    0.9777236052888477,
+    1.4771212547196624,
+    1.9777236052888478,
+    2.4771212547196626,
+    2.7403626894942437,
+    2.9777236052888476,
+    3,
+    3.0969100130080562,
+    3.1760912590556813,
+    3.3010299956639813,
+    3.3979400086720375,
+    3.4771212547196626,
+    3.5440680443502757,
+    3.6020599913279625,
+    3.6532125137753435,
+    3.6989700043360187,
+    3.7403626894942437,
+    3.845098040014257,
+    3.9777236052888476,
+    4.176091259055681,
+    4.477121254719663
+  ],
+  "outputs": {
+    "limonene_mM": {
+      "transform": "log10",
+      "unit": "mmol/L",
+      "coefficients": [
+        [
+          -8.860423014442633e-16,
+          2.217774294033643e-15,
+          0.9999999999999978,
+          -2.2278755376810366
+        ],
+        [
+          -6.232255904563451e-15,
+          5.3354981989548054e-15,
+          0.9999999999999993,
+          -1.7272731871118523
+        ],
+        [
+          5.3162538086655704e-15,
+          -3.991993729260554e-15,
+          1,
+          -1.2278755376810373
+        ],
+        [
+          -3.5612890883219754e-15,
+          3.112373949390305e-15,
+          1,
+          -0.7272731871118522
+        ],
+        [
+          5.316253808665573e-15,
+          -4.435548588067283e-15,
+          1.0000000000000004,
+          -0.22787553768103733
+        ],
+        [
+          -3.561289088321974e-15,
+          2.6677490994774035e-15,
+          1,
+          0.2727268128881478
+        ],
+        [
+          3.54416920577705e-15,
+          -2.217774294033642e-15,
+          1.0000000000000002,
+          0.7721244623189627
+        ],
+        [
+          -8.903222720804932e-15,
+          5.780123048867707e-15,
+          1.0000000000000009,
+          1.272726812888148
+        ],
+        [
+          8.860423014442618e-15,
+          -7.54043259971438e-15,
+          0.9999999999999998,
+          1.7721244623189634
+        ],
+        [
+          7.122578176643945e-15,
+          -2.2231242495645028e-15,
+          0.9999999999999989,
+          2.272726812888148
+        ],
+        [
+          6.408578710309278e-15,
+          4.217508636419121e-15,
+          1.0000000000000018,
+          2.7721244623189625
+        ],
+        [
+          -0.4453455152922678,
+          0.1057076193548009,
+          1.0000000000000056,
+          3.0353658970935444
+        ],
+        [
+          -529.503099803942,
+          11.181292433935607,
+          0.9749091426634887,
+          3.27272681288815
+        ],
+        [
+          -21.671433045402257,
+          -0.05662405297961293,
+          0.6847886113544933,
+          3.29413952044327
+        ],
+        [
+          -1.0537479063113444,
+          -0.274109733167056,
+          0.06322865449191535,
+          3.340246669955811
+        ],
+        [
+          3.680315676764631,
+          -0.6897209864620398,
+          0,
+          3.343011493223019
+        ],
+        [
+          -13.945138618485142,
+          2.6029153597166967,
+          0,
+          3.3394227167762214
+        ],
+        [
+          -14.38282263368222,
+          1.040929032782725,
+          0.11159769697166133,
+          3.3511761653191305
+        ],
+        [
+          -0.07546242526716829,
+          -0.036600193071433,
+          0.005915169789862805,
+          3.3593986790399506
+        ],
+        [
+          4.037725753618627,
+          -0.351233366721438,
+          0,
+          3.3596080009903138
+        ],
+        [
+          -0.2560346748309786,
+          0.01964522917739929,
+          0,
+          3.359214260669123
+        ],
+        [
+          4.519849313297871,
+          -0.3102254434333527,
+          0,
+          3.3592313951106627
+        ],
+        [
+          -214.73685003030306,
+          13.332802237759942,
+          0,
+          3.3590148838160387
+        ],
+        [
+          0,
+          0,
+          0,
+          3.3666294888737642
+        ],
+        [
+          0,
+          0,
+          0,
+          3.3666294888737642
+        ],
+        [
+          -4.551427593946465e-13,
+          1.3542840196511784e-13,
+          0,
+          3.3666294888737642
+        ],
+        [
+          -3.370087724041537e-14,
+          -9.457489198092679e-15,
+          0,
+          3.366629488873766
+        ]
+      ]
+    }
+  },
+  "conditions": {
+    "IPTG_h": 4,
+    "horizon_h": 25,
+    "dt_h": 0.25
+  },
+  "input_contract": "primary_LP_verified_no_growth_fallback_v3",
+  "provenance": {
+    "source_csv": "samples_v3.csv",
+    "source_csv_sha256": "26f480e0e3f9b1f038e59212b4817d665d8789578df4e269bfbba231e5a7fa18",
+    "scan_contract_sha256": "c448b95aa5810e8105ee9d8ad166302ab456e708f8ecbc8d2f437942d51a8208",
+    "trained_phases": [
+      "adaptive",
+      "train"
+    ],
+    "training_LS_count": 28,
+    "retained_LS_count": 28,
+    "generated_utc": "2026-09-23T17:03:16.726762+00:00"
+  },
+  "limitations": [
+    "Applies only to the archived model and stated simulation conditions.",
+    "DXS/IDI/GPPS reduction relies on structural audit and numerical invariance checks.",
+    "Finite sampling does not prove that every interior boundary was found.",
+    "Early infeasibility outputs are cumulative product at the last feasible state, never a 25 h prediction.",
+    "Termination brackets remain explicitly uncertain; observed endpoint-time ranges are not predicted bounds.",
+    "No extrapolation is permitted."
+  ],
+  "acceptance": {
+    "status": "validated",
+    "independent_validation_samples": 2104,
+    "failed_validation_runs": 0,
+    "failed_runs_all_phases": 0,
+    "all_observed_samples_passed": true,
+    "termination_bracket_resolution_passed": true,
+    "primary_infeasibility_input_contract": "primary_LP_verified_no_growth_fallback_v3",
+    "termination_ambiguous_fraction": 0.010931558935361217,
+    "relative_tolerance": 0.02,
+    "absolute_tolerance": 0.00001,
+    "meaning": "All supplied training, coverage and independent rows meet cumulative-until-termination tolerance and classification outside explicit Q-resolution ambiguity brackets; no failed run is ignored. Full prescribed coverage is a separate report gate. This is not proof of global boundary coverage or a 25 h prediction after early infeasibility."
+  }
+}
