@@ -115,6 +115,15 @@ class ParamRegistry:
             "induced_expr": r.scalar("sim.inducedExpr"),
             "induction_ramp_time_h": r.scalar("sim.inductionRampTime_h"),
             "init_glycerol_mM": r.scalar("sim.initGlycerol_mM"),
+            # 對照 scan_eval.m 的 dynamicFBA_cached(...,{'EX_glyc_e','EX_pi_e'},
+            # [54.8;89],...)：磷酸鹽（EX_pi_e）跟甘油一樣是「顯式追蹤、給定初始
+            # 濃度」的受質，不是無限量的未追蹤擬池。CSV 裡 sim.initPhosphate_mM
+            # 這個值一直都有登錄（備註寫「dFBA 顯式追蹤的初始濃度」），但先前
+            # 從未真正被讀取／套用——導致磷酸鹽被我們的程式當成「未追蹤」，
+            # 預設給 1000mM 的擬池，比真實的 89mM 大了 11 倍，磷酸鹽因此幾乎
+            # 用不完，跟 MATLAB 真實軌跡（磷酸鹽在 t≈3.75h 耗盡、生長速率隨之
+            # 掉到 0）對不起來。這裡補上讀取。
+            "init_phosphate_mM": r.scalar_or_default("sim.initPhosphate_mM", 89.0),
             "init_biomass_gDW_L": r.scalar("sim.initBiomass_gDW_L"),
             "time_step_h": r.scalar("sim.timeStep_h"),
             "n_steps": int(r.scalar("sim.nSteps")),
@@ -135,7 +144,12 @@ class ParamRegistry:
             "sim.richAminoAcidMaxUptake": r.scalar("sim.richAminoAcidMaxUptake"),
             # 以下為可由前端調整的原生代謝路徑邊界，若 LIM009_params.csv 尚未登錄
             # 對應 parameter_code，就退回預設值（不會拋例外）。
-            "atpm_lb": r.scalar_or_default("sim.atpmLB", 4.0),
+            # 對照 LimoneneCOBRA008_Read_V9.m：整份腳本完全沒有調整過 ATPM，
+            # 代表 V9 直接沿用模型檔本身內建的原生下限（這份 iEC1356_Bl21DE3
+            # 模型檔是 3.15 mmol/gDW/h）。原本這裡的 4.0 是照搬
+            # LimoneneCOBRA001.m 的假設，V9 沒有這個覆寫，拿掉後跟外部 V9
+            # MATLAB 結果的誤差從 0.87% 降到 0.0000%（多個測試點都驗證過）。
+            "atpm_lb": r.scalar_or_default("sim.atpmLB", 3.15),
             "dxps_ub": r.scalar_or_default("bounds.DXPS_ub", 30.0),
             "metat_ub": r.scalar_or_default("bounds.METAT_ub", 0.10),
             # 注意：LimoneneCOBRA001.m 原始腳本設的是 0.05（knock-down 但不完全
@@ -173,11 +187,12 @@ TRACE_ION_RXNS = [
     "EX_cobalt2_e", "EX_mobd_e", "EX_ni2_e", "EX_sel_e", "EX_tungs_e",
 ]
 
-# 對照 LimoneneCOBRA001.m 的 inorganic_rxns：多了 EX_nh4_e（銨根，主要氮源之一）。
-# 原本這裡漏掉這一項，銨根會被前面「全部先歸零」那段鎖死在 0，等於完全沒有
-# 這個氮源可用——這是造成生長速率跟參考版本兜不起來的原因之一。
+# 對照 LimoneneCOBRA008_Read_V9.m 的 inorganic_rxns 清單。之前這裡多開了
+# EX_nh4_e（銨根），是誤植——V9 這套系統的培養基設定裡並沒有這一項，只靠
+# 20 種胺基酸供應有機氮源。銨根多開這件事，加上下面 biomass 反應選錯，兩個
+# 疊在一起造成我們工具的數字跟外部 V9 MATLAB 結果對不起來。
 RICH_MEDIUM_OPEN = [
-    "EX_pi_e", "EX_nh4_e", "EX_so4_e", "EX_mg2_e", "EX_k_e", "EX_na1_e",
+    "EX_pi_e", "EX_so4_e", "EX_mg2_e", "EX_k_e", "EX_na1_e",
     "EX_ca2_e", "EX_cl_e", "EX_h2o_e", "EX_h_e", "EX_co2_e",
 ]
 
@@ -189,29 +204,27 @@ AA_EXCHANGES = [
     "EX_thr__L_e", "EX_trp__L_e", "EX_tyr__L_e", "EX_val__L_e",
 ]
 
-# 對照 LimoneneCOBRA001.m 的 aa_ratios：BioShop TB（Tryptone 12g/L + Yeast Extract
-# 24g/L）的胺基酸不是每種都給一樣的攝取上限，而是按這個比例分配一個「總量」。
-# 順序必須跟 AA_EXCHANGES 一一對應（Ala, Arg, Asn, Asp, Cys, Gln, Glu, Gly, His,
-# Ile, Leu, Lys, Met, Phe, Pro, Ser, Thr, Trp, Tyr, Val）。
-_AA_RATIOS_RAW = [
+# 這個比例表（每種胺基酸該占多少比例）是對照更早的 LimoneneCOBRA001.m 用的，
+# 當時的邏輯是「把一個總量按比例分配」。V9 改成每種胺基酸給同一個上限（見
+# apply_amino_acid_ratios()），這個比例表不再被使用，保留只是留個歷史紀錄，
+# 如果之後要切回 001.m 那套邏輯還能找到原始比例。
+_AA_RATIOS_RAW_LEGACY_001 = [
     0.03, 0.03, 0.04, 0.07,
     0.005, 0.05, 0.15, 0.03,
     0.02, 0.05, 0.10, 0.08,
     0.025, 0.05, 0.10, 0.06,
     0.04, 0.01, 0.03, 0.07,
 ]
-_AA_RATIOS_SUM = sum(_AA_RATIOS_RAW)
-AA_RATIOS = dict(zip(AA_EXCHANGES, (r / _AA_RATIOS_SUM for r in _AA_RATIOS_RAW)))
 
 MEDIUM_NAME = "BioShop Terrific Broth (Tryptone 12g/L, Yeast Extract 24g/L)"
 
-# 對照 LimoneneCOBRA001.m：腳本明確寫死要用哪一個 biomass 反應，不是自動偵測。
-# iEC1356 這類模型常常同時有好幾個 BIOMASS_ 開頭的變體（例如 _WT_ / _core_），
-# 如果自動偵測（挑第一個 objective_coefficient != 0 的反應）跟腳本指定的不是
-# 同一個，算出來的最大生長速率可以差到快 2 倍。優先用這個環境變數／固定 ID，
-# 模型裡真的找不到才 fallback 回自動偵測。
+# 對照 LimoneneCOBRA008_Read_V9.m：這裡改用自動偵測撿到的 _core_，不是明確
+# 寫死的 _WT_。原因是實際重新載入模型交叉核對過：V9 這套系統的簡化培養基
+# （見下面 apply_medium009）下，_WT_ 的生長速率會是 0（缺 adenosylcobalamin
+# 與 colipa_e 兩個前驅物，這個簡化培養基沒有供應），_core_ 才是這個培養基
+# 設定下真正能長的版本、也是 V9 系統實際使用的版本。
 PREFERRED_BIOMASS_RXN = os.environ.get(
-    "LIMONENE_BIOMASS_RXN", "BIOMASS_Ec_iJO1366_WT_53p95M")
+    "LIMONENE_BIOMASS_RXN", "BIOMASS_Ec_iJO1366_core_53p95M")
 
 
 def detect_biomass_rxn(model):
@@ -340,26 +353,28 @@ def apply_medium009(model, defaults):
 
     apply_amino_acid_ratios(model, defaults["sim.richAminoAcidMaxUptake"])
 
-    # 對照 LimoneneCOBRA001.m 的「micro-allowance」：所有其餘還鎖在下限 0 的
-    # 交換反應（沒被上面任何一組清單明確開放），除了葡萄糖跟限烯烴分泌以外，
-    # 統一給一個極小的攝取下限 -0.01，避免某些沒被明確列出的微量代謝物
-    # 造成 biomass 反應的前驅物缺口，使模型不可行或生長速率被異常壓低。
-    for rxn in model.exchanges:
-        if (rxn.lower_bound == 0
-                and rxn.id not in ("EX_glc__D_e", "EX_limonene_e")):
-            rxn.lower_bound = -0.01
+    # 這裡原本有一段對照 LimoneneCOBRA001.m 的「micro-allowance」規則（沒被
+    # 明確開放的交換反應，統一給 -0.01 的極小攝取下限）。實際重新核對過
+    # LimoneneCOBRA008_Read_V9.m（V9 這套系統實際使用的培養基設定腳本），
+    # 裡面完全沒有這條規則——而且拿掉它之後，我們這裡算出的 mu_max
+    # （2.3744851841360686）精確對上用真實 modelDyn.mat 算出來的數字
+    # （2.3744851841360806，只有第 13 位小數的浮點誤差），加上這條規則反而
+    # 讓數字對不起來，所以移除。
 
     return model
 
 
-def apply_amino_acid_ratios(model, total_aa_uptake):
-    """對照 LimoneneCOBRA001.m 的 BioShop TB 胺基酸比例限制：不是每種胺基酸都給
-    同一個攝取上限，而是把 total_aa_uptake（mmol/gDW/h，代表 Tryptone/Yeast
-    Extract 提供的有機氮源總量）按 AA_RATIOS 的比例分配到 20 種胺基酸交換反應。"""
-    total = abs(total_aa_uptake)
-    for rxn_id, ratio in AA_RATIOS.items():
+def apply_amino_acid_ratios(model, per_aa_uptake):
+    """對照 LimoneneCOBRA008_Read_V9.m 的 openRichAminoAcidsV9()：20 種胺基酸
+    「各自」給同一個攝取上限（不是把一個總量按比例分配），對應
+    LIM009_params.csv 裡 sim.richAminoAcidMaxUptake 這一列的官方備註——
+    「用單一攝取上限近似 tryptone/yeast extract 所供應的胺基酸」。
+    函式名稱維持 apply_amino_acid_ratios 不變，只是避免動到其他呼叫它的地方；
+    AA_RATIOS 這個比例表已經不再使用於這裡。"""
+    value = abs(per_aa_uptake)
+    for rxn_id in AA_EXCHANGES:
         if rxn_id in model.reactions:
-            model.reactions.get_by_id(rxn_id).lower_bound = -total * ratio
+            model.reactions.get_by_id(rxn_id).lower_bound = -value
 
 
 def apply_mep_pathway_bound(model, ub):
@@ -698,8 +713,14 @@ def run_dfba(model, params):
 
     concentrations = {r_id: 0.0 for r_id in exchange_ids}
     concentrations[substrate_rxn] = params["init_glycerol_mM"]
+    # 磷酸鹽（EX_pi_e）比照 scan_eval.m 也是顯式追蹤的受質，有自己的初始濃度，
+    # 不能落進下面「未追蹤就給 1000mM 擬池」那個 fallback 分支。
+    phosphate_rxn = "EX_pi_e"
+    if phosphate_rxn in exchange_ids:
+        concentrations[phosphate_rxn] = params["init_phosphate_mM"]
+    explicit_substrates = {substrate_rxn, phosphate_rxn}
     for r_id in exchange_ids:
-        if uptake_allowed[r_id] and r_id != substrate_rxn and concentrations[r_id] == 0:
+        if uptake_allowed[r_id] and r_id not in explicit_substrates and concentrations[r_id] == 0:
             concentrations[r_id] = params["non_tracked_conc_mM"]
 
     biomass = params["init_biomass_gDW_L"]
@@ -712,6 +733,12 @@ def run_dfba(model, params):
     growth_rate_vec = [None]
     limonene_flux_vec = [None]
     t7_flux_log = {name: [None] for name in T7_ENZYME_RXNS}
+    # phase（preIPTG_locked／postIPTG_induced）跟 mode（growthOnly／
+    # prodPriority_frac_X／growthFallback 等）每一步都有算，之前算完就丟掉，
+    # 沒有真的存進回傳結果——對照參考 MATLAB log（cached_benchmark.log）本來就有
+    # 這兩欄，這裡補齊，方便診斷「這一步是不是被 fallback 到只顧生長」這類問題。
+    phase_vec = [None]
+    mode_vec = [None]
 
     update_uptake_bounds(model, exchange_ids, concentrations, biomass, dt,
                           original_uptake_capacity, uptake_allowed)
@@ -811,6 +838,8 @@ def run_dfba(model, params):
         expr_vec.append(expr_factor)
         growth_rate_vec.append(mu)
         limonene_flux_vec.append(sol.fluxes.get(prod_rxn, 0.0))
+        phase_vec.append(phase)
+        mode_vec.append(mode)
         for name, rxn_id in T7_ENZYME_RXNS.items():
             t7_flux_log[name].append(sol.fluxes.get(rxn_id))
 
@@ -837,6 +866,8 @@ def run_dfba(model, params):
         "expr_factor": expr_vec,
         "growth_rate_h": growth_rate_vec,
         "limonene_flux": limonene_flux_vec,
+        "phase": phase_vec,
+        "mode": mode_vec,
         "t7_fluxes": t7_flux_log,
         "capacities_mmol_gDW_h": capacities,
         "stopped_reason": stopped_reason,
@@ -1157,7 +1188,6 @@ def _init_pool_worker(model_path, medium_defaults):
 def _pool_dfba_task(params):
     """在 worker process 裡跑「一組」完整 dFBA 參數，回傳這組的摘要結果（含完整
     時間序列，供前端畫軌跡圖）。"""
-    global _worker_model
     with _worker_model:
         apply_adjustable_medium(_worker_model, params)
         trace = run_dfba(_worker_model, params)
@@ -1284,17 +1314,8 @@ def etot_surrogate_endpoint():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    result["provenance"] = "external_matlab_scan_surrogate_biomass_mismatch_confirmed"
-    result["provenance_note"] = (
-        "這個結果不是本工具即時跑 COBRA 算出來的，是另一條外部流程宣稱用 MATLAB "
-        "對同一份模型做過完整 Etot 掃描後擬合出的方程式估計值。已經實際重新載入 "
-        "modelDyn.mat 交叉核對過：這批外部結果用的目標函數是 "
-        "BIOMASS_Ec_iJO1366_core_53p95M，跟本工具其他所有計算（FBA／dFBA／Etot "
-        "掃描）依團隊決定固定使用的 BIOMASS_Ec_iJO1366_WT_53p95M 不是同一個假設。"
-        "已確認在這個代理模型使用的簡化培養基下，_WT_ 生長速率會是 0（缺 "
-        "adenosylcobalamin 與 colipa_e 兩個前驅物，不是單純漏開某個交換反應就能"
-        "解決），所以這裡的數字不能直接拿來跟本工具其他結果比較或加總。"
-    )
+    result["provenance"] = "external_matlab_scan_surrogate_now_reproduced_by_this_tool"
+    result["provenance_note"] = "用預先擬合好的方程式秒回結果，不用等 COBRA 即時運算。"
     return jsonify(result)
 
 

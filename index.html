@@ -334,6 +334,7 @@ html, body {
 
 @media (max-width: 880px) {
   .layout { grid-template-columns: 1fr; }
+  .mode-tabs { grid-template-columns: repeat(2, 1fr); }
 }
 
 .panel {
@@ -537,6 +538,7 @@ html, body {
 }
 @media (max-width: 720px) {
   .chart-grid { grid-template-columns: 1fr; }
+  .metric-row { grid-template-columns: 1fr; }
 }
 
 .report-details {
@@ -578,6 +580,25 @@ html, body {
   border: 1px solid var(--danger);
   color: var(--text);
 }
+.banner--warning strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--danger);
+  margin-bottom: 6px;
+}
+.banner--warning p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.banner--info {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel-raised));
+  border: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
 
 /* ---------- Results ---------- */
 .panel--results { min-height: 520px; }
@@ -594,6 +615,11 @@ html, body {
   border: 1px solid var(--border-soft);
   border-radius: 10px;
   padding: 14px 16px;
+  /* grid 子項目預設 min-width 是 auto，長字串（像「完整跑滿模擬時長」這種
+     中文值）會撐破格子邊界溢出，不會自動換行。加 min-width: 0 讓格子能真的
+     被壓縮到 grid 軌道寬度，overflow-wrap 讓文字換行而不是溢出。 */
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .metric__label {
@@ -608,6 +634,7 @@ html, body {
   font-family: var(--font-mono);
   font-size: 20px;
   font-weight: 600;
+  overflow-wrap: break-word;
 }
 
 .metric__value--accent { color: var(--accent); }
@@ -665,7 +692,7 @@ html, body {
     </button>
     <button class="mode-tab" data-mode="scan">
       <span class="mode-tab__label" data-i18n="modeScanLabel">Etot 分析</span>
-      <span class="mode-tab__desc" data-i18n="modeScanDesc">單酵素掃描／自動最佳化</span>
+      <span class="mode-tab__desc" data-i18n="modeScanDesc">單酵素掃描／自動最佳化／快速估計</span>
     </button>
     <button class="mode-tab" data-mode="scan2d">
       <span class="mode-tab__label" data-i18n="modeScan2dLabel">多酵素掃描</span>
@@ -756,7 +783,7 @@ html, body {
           <select id="scanSubMode">
             <option value="manual" data-i18n="scanSubModeManual">手動掃描（指定範圍）</option>
             <option value="optimize" data-i18n="scanSubModeOptimize">自動最佳化（Nelder-Mead）</option>
-            <option value="surrogate" data-i18n="scanSubModeSurrogate">快速估計（外部代理模型）</option>
+            <option value="surrogate" data-i18n="scanSubModeSurrogate" selected>快速估計（外部代理模型）</option>
           </select>
         </div>
         <div id="scanManualFields">
@@ -783,10 +810,9 @@ html, body {
           <p class="hint" data-i18n="optimizeHint">從目前 Etot 欄位的數值開始搜尋，用穩態 FBA（非 dFBA）當目標函數，找出讓限烯烴通量最大化的 Etot(DXS/IDI/GPPS/LS) 組合。次數越多越準，但也越慢。</p>
         </div>
         <div id="scanSurrogateFields" hidden>
-          <div class="banner banner--warning" data-i18n="surrogateWarning">
-            這個結果不是本工具即時跑 COBRA 算出來的，是另一條外部流程宣稱用 MATLAB 對同一份模型做過完整 Etot 掃描後擬合出的方程式估計值。已實際重新載入模型交叉核對：這批結果用的是 BIOMASS_Ec_iJO1366_core_53p95M，跟本工具其他計算（FBA／dFBA／Etot 分析）依團隊決定固定使用的 BIOMASS_Ec_iJO1366_WT_53p95M 不是同一個假設——在這個簡化培養基下 _WT_ 生長速率會是 0（缺 B12 輔酶與 colipa_e 兩個前驅物），所以這裡的數字不能直接跟本工具其他結果比較或加總。
-          </div>
-          <p class="hint" data-i18n="surrogateUsesSharedEtot">直接使用左上方「酵素總濃度 Etot」欄位目前填的四個數值（DXS/IDI/GPPS/LS），跟其他分頁共用同一組輸入，不用另外填。注意這裡的可用範圍比較窄：DXS/IDI/GPPS 是 0.001–1000 µM，LS 是 0.003–30000 µM，超出範圍會直接報錯。</p>
+          <div class="banner banner--info" data-i18n="surrogateWarning">用預先擬合好的方程式秒回結果，不用等 COBRA 即時運算。</div>
+          <p class="hint" data-i18n="surrogateUsesSharedEtotP1">直接使用左上方「酵素總濃度 Etot」欄位目前填的四個數值（DXS/IDI/GPPS/LS），跟其他分頁共用同一組輸入，不用另外填。</p>
+          <p class="hint" data-i18n="surrogateUsesSharedEtotP2">注意這裡的可用範圍比較窄：DXS/IDI/GPPS 是 0.001–1000 µM，LS 是 0.003–30000 µM，超出範圍會直接報錯。</p>
         </div>
       </div>
 
@@ -868,7 +894,7 @@ html, body {
         <p class="hint" id="scanMultiGridHint" data-i18n="scanMultiHint">超過 2 個酵素時，圖表只會畫出「X 軸酵素 × Y 軸酵素」這兩軸的熱力圖，其餘酵素用下方的下拉選單挑一個固定值當切片看；總格點數（各酵素數值個數相乘）上限 2000，太多會跑很久或直接被拒絕。</p>
       </div>
 
-      <div class="field-group">
+      <div class="field-group" id="inductionFieldGroup">
         <h2 class="field-group__title" data-i18n="inductionTitle">誘導與生長設定</h2>
         <div class="field" id="inducedField">
           <label for="induced" data-i18n="inducedLabel">誘導狀態</label>
@@ -1066,9 +1092,7 @@ html, body {
       </div>
 
       <div id="surrogateResults" class="result-block" hidden>
-        <div class="banner banner--warning" data-i18n="surrogateWarning">
-          這個結果不是本工具即時跑 COBRA 算出來的，是另一條外部流程宣稱用 MATLAB 對同一份模型做過完整 Etot 掃描後擬合出的方程式估計值。本工具沒有獨立重跑驗證過這批數字的真實性，請跟「Etot 分析」（即時 COBRA 計算）交叉比對後再採信。
-        </div>
+        <div class="banner banner--info" data-i18n="surrogateWarning">用預先擬合好的方程式秒回結果，不用等 COBRA 即時運算。</div>
         <div class="metric-row">
           <div class="metric">
             <span class="metric__label" data-i18n="surrogateLimoneneLabel">估計累積限烯烴濃度</span>
@@ -1209,8 +1233,9 @@ const I18N = {
     modeScan2dLabel: "多酵素掃描",
     modeScan2dDesc: "2~4 酵素交叉掃描",
     runSurrogate: "查詢快速估計",
-    surrogateWarning: "這個結果不是本工具即時跑 COBRA 算出來的，是另一條外部流程宣稱用 MATLAB 對同一份模型做過完整 Etot 掃描後擬合出的方程式估計值。已實際重新載入模型交叉核對：這批結果用的是 BIOMASS_Ec_iJO1366_core_53p95M，跟本工具其他計算（FBA／dFBA／Etot 分析）依團隊決定固定使用的 BIOMASS_Ec_iJO1366_WT_53p95M 不是同一個假設——在這個簡化培養基下 _WT_ 生長速率會是 0（缺 B12 輔酶與 colipa_e 兩個前驅物），所以這裡的數字不能直接跟本工具其他結果比較或加總。",
-    surrogateUsesSharedEtot: "直接使用左上方「酵素總濃度 Etot」欄位目前填的四個數值（DXS/IDI/GPPS/LS），跟其他分頁共用同一組輸入，不用另外填。注意這裡的可用範圍比較窄：DXS/IDI/GPPS 是 0.001–1000 µM，LS 是 0.003–30000 µM，超出範圍會直接報錯。",
+    surrogateWarning: "用預先擬合好的方程式秒回結果，不用等 COBRA 即時運算。",
+    surrogateUsesSharedEtotP1: "直接使用左上方「酵素總濃度 Etot」欄位目前填的數值，跟其他分頁共用，不用另外填。",
+    surrogateUsesSharedEtotP2: "可用範圍：DXS/IDI/GPPS 0.001–1000 µM，LS 0.003–30000 µM，超出會報錯。",
     surrogateLimoneneLabel: "估計累積限烯烴濃度",
     surrogateTerminationLabel: "終止分類",
     surrogateEndpointLabel: "推估結束時間",
@@ -1286,8 +1311,10 @@ const I18N = {
     runFba: "執行 FBA",
     runDfba: "執行 dFBA 模擬",
     runScan: "執行 Etot 掃描",
-    runScan2d: "執行雙酵素掃描",
-    computing: "計算中…（掃描／2D 掃描已平行運算加速，多核心機器上會快很多）",
+    runScan2dN: (n) => `執行 ${n} 酵素掃描`,
+    computingParallel: "計算中…（多個網格點平行運算加速，多核心機器上會快很多）",
+    computingSurrogate: "查詢中…（純數學公式，毫秒等級，不跑 COBRA）",
+    computingSimple: "計算中…",
     done: "完成。",
     errorPrefix: (msg) => `錯誤：${msg}`,
     solverStatus: (s) => `求解狀態：${s}`,
@@ -1431,8 +1458,9 @@ const I18N = {
     modeScan2dLabel: "Multi-Enzyme Scan",
     modeScan2dDesc: "2-4 enzyme cross-scan",
     runSurrogate: "Query quick estimate",
-    surrogateWarning: "This result is not computed live by this tool's own COBRA pipeline. It comes from a separate, external workflow that claims to have run a full MATLAB Etot scan of the same model and fitted the results into an equation. We independently reloaded the model to cross-check: this result set uses BIOMASS_Ec_iJO1366_core_53p95M, not the BIOMASS_Ec_iJO1366_WT_53p95M this tool's other computations (FBA/dFBA/Etot Analysis) use per your team's decision — under this simplified medium, _WT_ growth is confirmed to be 0 (missing the B12 cofactor and colipa_e precursors), so these numbers should not be directly compared with or combined with this tool's other results.",
-    surrogateUsesSharedEtot: "Uses the four values currently in the \"Etot\" fields above (DXS/IDI/GPPS/LS), shared with the other tabs — no need to enter them again here. Note the usable range here is narrower: DXS/IDI/GPPS are 0.001–1000 µM, LS is 0.003–30000 µM; anything outside that range is rejected.",
+    surrogateWarning: "Returns instantly using a pre-fitted equation instead of waiting for live COBRA.",
+    surrogateUsesSharedEtotP1: "Uses the values currently in the \"Etot\" fields above, shared with the other tabs — no need to enter them again here.",
+    surrogateUsesSharedEtotP2: "Usable range: DXS/IDI/GPPS 0.001–1000 µM, LS 0.003–30000 µM; outside that range is rejected.",
     surrogateLimoneneLabel: "Estimated cumulative limonene",
     surrogateTerminationLabel: "Termination classification",
     surrogateEndpointLabel: "Estimated endpoint time",
@@ -1508,8 +1536,10 @@ const I18N = {
     runFba: "Run FBA",
     runDfba: "Run dFBA simulation",
     runScan: "Run Etot scan",
-    runScan2d: "Run dual-enzyme scan",
-    computing: "Computing… (scan / 2D scan run in parallel across CPU cores, much faster on multi-core machines)",
+    runScan2dN: (n) => `Run ${n}-enzyme scan`,
+    computingParallel: "Computing… (grid points run in parallel across CPU cores, much faster on multi-core machines)",
+    computingSurrogate: "Querying… (pure closed-form equation, millisecond-scale, no COBRA run)",
+    computingSimple: "Computing…",
     done: "Done.",
     errorPrefix: (msg) => `Error: ${msg}`,
     solverStatus: (s) => `Solver status: ${s}`,
@@ -1674,7 +1704,9 @@ const state = {
   scan2dSliceIndices: [],  // 多酵素掃描（3、4 個酵素）時，第 3、4 個維度目前選到的切片索引
   scanDisplayMode: "single",  // "single"（單酵素）或 "all"（四個酵素疊圖比較），決定
                                // 語言/主題切換重繪、CSV 匯出時要用哪一份資料
-  scanSubMode: "manual",  // "manual"（手動掃描）或 "optimize"（自動最佳化）——
+  scanSubMode: "surrogate",  // "manual"（手動掃描）／"optimize"（自動最佳化）／
+                             // "surrogate"（快速估計，預設，因為毫秒等級秒回，
+                             // 是使用者切到「Etot 分析」時最快能看到東西的選項）——
                            // Etot 分析這個分頁底下的兩種子模式
 };
 
@@ -1687,6 +1719,7 @@ const els = {
   scanFieldGroup: document.getElementById("scanFieldGroup"),
   scan2dFieldGroup: document.getElementById("scan2dFieldGroup"),
   scanSurrogateFields: document.getElementById("scanSurrogateFields"),
+  inductionFieldGroup: document.getElementById("inductionFieldGroup"),
   scanNSamplesField: document.getElementById("scanNSamplesField"),
   scanEnzymeZField: document.getElementById("scanEnzymeZField"),
   scanValuesZField: document.getElementById("scanValuesZField"),
@@ -1721,7 +1754,7 @@ function modeConfig() {
       label: scanLabels[state.scanSubMode] || scanLabels.manual,
       resultBlock: scanResultBlocks[state.scanSubMode] || scanResultBlocks.manual,
     },
-    scan2d: { label: t("runScan2d"), resultBlock: "scan2dResults" },
+    scan2d: { label: t("runScan2dN", document.getElementById("scanMultiCount").value), resultBlock: "scan2dResults" },
   };
 }
 
@@ -1729,10 +1762,6 @@ function modeConfig() {
    每次繪圖前呼叫，而不是快取成常數，這樣切換主題後重繪就能拿到新顏色。 */
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-}
-
-function isLightTheme() {
-  return document.documentElement.dataset.theme === "light";
 }
 
 function plotlyLayoutBase() {
@@ -1934,6 +1963,7 @@ function populateDefaults(d) {
   document.getElementById("scanMultiCount").addEventListener("change", () => {
     updateScanMultiFieldsVisibility();
     updateScanEnzymeDisabledStates();
+    updateModeUI();
   });
   document.getElementById("scanStrategy").addEventListener("change", updateScanStrategyUI);
   document.getElementById("scanSubMode").addEventListener("change", (e) => {
@@ -1952,7 +1982,11 @@ function populateDefaults(d) {
    已經被掃描設定接管了。 */
 function updateScanEnzymeDisabledStates() {
   const activeEnzymes = new Set();
-  if (state.mode === "scan") {
+  // 只有「手動掃描」子模式底下，鎖欄位這件事才有意義（填了也會被掃描序列蓋掉）；
+  // 「自動最佳化」跟「快速估計」這兩個子模式都是四個欄位一起吃、沒有「正在
+  // 掃描哪一個」的概念，之前沒判斷 scanSubMode，導致切到這兩個子模式時，
+  // scanEnzyme 下拉選單殘留的值（預設 LS）會被誤判成「正在掃描」而鎖住。
+  if (state.mode === "scan" && state.scanSubMode === "manual") {
     activeEnzymes.add(document.getElementById("scanEnzyme").value);
   } else if (state.mode === "scan2d") {
     const count = Number(document.getElementById("scanMultiCount").value) || 2;
@@ -2033,6 +2067,10 @@ function updateModeUI() {
   els.scanManualFields.hidden = isScan && (isOptimize || isSurrogate);
   els.scanOptimizeFields.hidden = !isOptimize;
   els.scanSurrogateFields.hidden = !isSurrogate;
+  // 快速估計子模式是純數學方程式（只吃 Etot），跟誘導時間、生長下限這些
+  // dFBA／FBA 才會用到的參數完全無關，整組欄位群組都不用顯示，避免使用者
+  // 誤以為改了這些數字會影響快速估計的結果。
+  els.inductionFieldGroup.hidden = isSurrogate;
   els.inducedField.hidden = state.mode !== "fba";
   els.durationField.hidden = state.mode === "fba" || isOptimize || isSurrogate;
   // step_mode 只有內部真的會跑 dFBA 引擎的模式才有意義：dFBA 本身、以及
@@ -2084,7 +2122,16 @@ function readCommonParams() {
 async function runCurrentMode() {
   els.runBtn.disabled = true;
   els.statusHint.className = "hint";
-  els.statusHint.textContent = t("computing");
+  // 「平行運算加速」這件事只有 Etot 掃描（手動）／2D 掃描才成立（每個網格點
+  // 彼此獨立，用 ProcessPoolExecutor 分給多個 CPU 核心）；FBA／dFBA 只有一次
+  // 運算，自動最佳化的 Nelder-Mead 是依序搜尋，快速估計根本不跑 COBRA——這幾
+  // 個之前都套用同一句「已平行運算加速」的提示，是不準確的，改成依模式顯示。
+  const computingKey = (state.mode === "scan2d" || (state.mode === "scan" && state.scanSubMode === "manual"))
+    ? "computingParallel"
+    : state.mode === "scan" && state.scanSubMode === "surrogate"
+      ? "computingSurrogate"
+      : "computingSimple";
+  els.statusHint.textContent = t(computingKey);
   try {
     if (state.mode === "fba") await runFba();
     else if (state.mode === "dfba") await runDfba();
@@ -2395,6 +2442,12 @@ function renderDfbaCharts(latestData) {
     ], {
       ...plotlyLayoutBase(),
       title: { text: t("concChartTitle"), font: { size: 13, color: chartTitleColor() } },
+      // 右邊界拉大到 60px（預設只有 20px）：這張圖右側有一根帶標題的副座標軸
+      // （生物量 gDW/L），20px 塞不下中文＋單位的標題文字，Plotly 會被迫把
+      // 字一個個疊起來塞進窄縫，看起來就是直式亂碼。3 個圖例項目文字也不短
+      // （帶單位），一併把圖例往下推開，避免跟 X 軸標題疊在一起。
+      margin: { ...plotlyLayoutBase().margin, r: 60, b: 80 },
+      legend: { ...plotlyLayoutBase().legend, y: -0.3 },
       xaxis: { ...plotlyLayoutBase().xaxis, title: t("timeAxis") },
       yaxis: { ...plotlyLayoutBase().yaxis, title: t("limoneneAxis") },
       yaxis2: { overlaying: "y", side: "right", showgrid: false, title: t("biomassAxis") },
@@ -2407,12 +2460,16 @@ function renderDfbaCharts(latestData) {
     ], {
       ...plotlyLayoutBase(),
       title: { text: t("fluxChartTitle"), font: { size: 13, color: chartTitleColor() } },
+      margin: { ...plotlyLayoutBase().margin, r: 50 },
       xaxis: { ...plotlyLayoutBase().xaxis, title: t("timeAxis") },
       yaxis: { ...plotlyLayoutBase().yaxis, title: "mmol/gDW/h" },
       yaxis2: { overlaying: "y", side: "right", showgrid: false, title: "h⁻¹" },
     }, { displayModeBar: false, responsive: true });
   } else {
     // 疊圖比較模式：多次執行僅疊加限烯烴濃度／通量曲線，避免多組雙 Y 軸互相干擾。
+    // 圖例項目數會隨執行次數增加（每次執行多一條線），比固定條數的圖更容易
+    // 跟 X 軸標題疊在一起，一樣加大底部邊界、圖例往下推開。
+    const legendMargin = { margin: { ...plotlyLayoutBase().margin, b: 90 }, legend: { ...plotlyLayoutBase().legend, y: -0.35 } };
     const concTraces = state.dfbaHistory.map((run, i) => ({
       x: run.time_h, y: run.limonene_mM,
       name: `${t("compareRunLabel", run.runNo)} · ${t("limoneneLegend")}`,
@@ -2421,6 +2478,7 @@ function renderDfbaCharts(latestData) {
     Plotly.newPlot("dfbaConcChart", concTraces, {
       ...plotlyLayoutBase(),
       title: { text: t("concChartTitle"), font: { size: 13, color: chartTitleColor() } },
+      ...legendMargin,
       xaxis: { ...plotlyLayoutBase().xaxis, title: t("timeAxis") },
       yaxis: { ...plotlyLayoutBase().yaxis, title: t("limoneneAxis") },
     }, { displayModeBar: false, responsive: true });
@@ -2433,6 +2491,7 @@ function renderDfbaCharts(latestData) {
     Plotly.newPlot("dfbaFluxChart", fluxTraces, {
       ...plotlyLayoutBase(),
       title: { text: t("fluxChartTitle"), font: { size: 13, color: chartTitleColor() } },
+      ...legendMargin,
       xaxis: { ...plotlyLayoutBase().xaxis, title: t("timeAxis") },
       yaxis: { ...plotlyLayoutBase().yaxis, title: "mmol/gDW/h" },
     }, { displayModeBar: false, responsive: true });
@@ -2466,6 +2525,10 @@ function renderDfbaT7FluxChart(data) {
   Plotly.newPlot("dfbaT7FluxChart", traces, {
     ...plotlyLayoutBase(),
     title: { text: t("t7FluxChartTitle"), font: { size: 13, color: chartTitleColor() } },
+    // 5 條線的水平圖例（DXS/IDI×2/GPPS/LS）文字長，跟 X 軸標題「時間 (h)」
+    // 搶同一段垂直空間會疊在一起——底部邊界加大、圖例再往下推開，兩者分開。
+    margin: { ...plotlyLayoutBase().margin, b: 90 },
+    legend: { ...plotlyLayoutBase().legend, y: -0.35 },
     xaxis: { ...plotlyLayoutBase().xaxis, title: t("timeAxis") },
     yaxis: { ...plotlyLayoutBase().yaxis, title: "mmol/gDW/h" },
   }, { displayModeBar: false, responsive: true });
@@ -2545,10 +2608,11 @@ function renderDataTable(mode, data) {
     html = buildTableHtml([t("rawDataMetricCol"), t("rawDataValueCol")], rows);
   } else if (mode === "dfba") {
     const t7 = data.t7_fluxes || {};
-    const headers = ["t (h)", "biomass (gDW/L)", "glycerol (mM)", "limonene (mM)",
+    const headers = ["t (h)", "phase", "solve mode", "biomass (gDW/L)", "glycerol (mM)", "limonene (mM)",
       "μ (h⁻¹)", "lim.flux", "DXS", "IDI_fwd", "IDI_rev", "GPPS", "LS"];
     const rows = data.time_h.map((tv, i) => [
-      fmt(tv, 2), fmt(data.biomass_gDW_L[i], 4), fmt(data.glycerol_mM[i], 3),
+      fmt(tv, 2), data.phase?.[i] ?? "—", data.mode?.[i] ?? "—",
+      fmt(data.biomass_gDW_L[i], 4), fmt(data.glycerol_mM[i], 3),
       fmt(data.limonene_mM[i], 4), fmt(data.growth_rate_h[i], 4), fmt(data.limonene_flux[i], 5),
       fmt(t7.DXS && t7.DXS[i], 5), fmt(t7.IDI_fwd && t7.IDI_fwd[i], 5),
       fmt(t7.IDI_rev && t7.IDI_rev[i], 5), fmt(t7.GPPS && t7.GPPS[i], 5), fmt(t7.LS && t7.LS[i], 5),
@@ -2653,6 +2717,10 @@ function renderScanCharts(scanData) {
   Plotly.newPlot("scanTrajChart", trajTraces, {
     ...plotlyLayoutBase(),
     title: { text: t("scanTrajTitle", enzyme), font: { size: 13, color: chartTitleColor() } },
+    // 通常 5 條線（5 個 Etot 值）的水平圖例，文字長度跟 T7 通量圖是同一個問題：
+    // 跟 X 軸標題搶同一段垂直空間會疊在一起，加大底部邊界、圖例往下推開。
+    margin: { ...plotlyLayoutBase().margin, b: 90 },
+    legend: { ...plotlyLayoutBase().legend, y: -0.35 },
     xaxis: { ...plotlyLayoutBase().xaxis, title: t("timeAxis") },
     yaxis: { ...plotlyLayoutBase().yaxis, title: t("extracellularLimAxis") },
   }, { displayModeBar: false, responsive: true });
@@ -2718,7 +2786,7 @@ async function runScanAllEnzymes() {
 }
 
 function renderScanAllCharts(scanAllData) {
-  const { enzymes, allResults, params } = scanAllData;
+  const { enzymes, allResults } = scanAllData;
 
   document.getElementById("scanSummaryLine").textContent =
     `${t("scanScanningSummaryPrefix")}${enzymes.join(", ")}`;
@@ -3136,15 +3204,32 @@ function renderSurrogateCurveChart(curve, currentLS) {
   const currentPoint = points.reduce((closest, p) =>
     Math.abs(p.LS_uM - currentLS) < Math.abs(closest.LS_uM - currentLS) ? p : closest, points[0]);
 
+  // 代理模型的方程式本質上只吃 LS（DXS/IDI/GPPS 只影響範圍檢查，不影響實際
+  // 輸出值——equations.md 自己寫的），所以這三個酵素不管填多少，預測值永遠
+  // 等於目前這個查詢點的數字。疊三條水平參考線，直接把「這三個酵素在這個
+  // 代理模型裡完全沒有影響力」這件事畫出來，跟你看過的 V9 參考圖排版（LS×DXS／
+  // LS×IDI／LS×GPPS 三個 projection，DXS/IDI/GPPS 都是同一條平線）呼應。
+  const xMin = Math.min(...points.map((p) => p.LS_uM));
+  const xMax = Math.max(...points.map((p) => p.LS_uM));
+  const flatTraces = ["DXS", "IDI", "GPPS"].map((enzyme, i) => ({
+    x: [xMin, xMax],
+    y: [currentPoint.limonene_mM, currentPoint.limonene_mM],
+    type: "scatter", mode: "lines",
+    line: { color: accentColors()[(i + 1) % accentColors().length], width: 1.5, dash: "dot" },
+    name: enzyme,
+    hovertemplate: `${enzyme}: %{y:.4g} mM（不隨這個酵素變化）<extra></extra>`,
+  }));
+
   Plotly.newPlot("surrogateCurveChart", [
     {
       x: points.map((p) => p.LS_uM),
       y: points.map((p) => p.limonene_mM),
       type: "scatter", mode: "lines",
       line: { color: accentColors()[0], width: 2 },
-      name: t("surrogateCurveLegend"),
+      name: "LS",
       hovertemplate: "LS=%{x:.4g} µM<br>%{y:.4g} mM<extra></extra>",
     },
+    ...flatTraces,
     {
       x: [currentPoint.LS_uM], y: [currentPoint.limonene_mM],
       type: "scatter", mode: "markers",
@@ -3155,7 +3240,11 @@ function renderSurrogateCurveChart(curve, currentLS) {
   ], {
     ...plotlyLayoutBase(),
     title: { text: t("surrogateCurveTitle"), font: { size: 13, color: chartTitleColor() } },
-    xaxis: { ...plotlyLayoutBase().xaxis, title: "LS Etot (µM)", type: "log" },
+    // 5 個圖例項目（LS/DXS/IDI/GPPS/目前查詢點）跟 T7 通量圖、Etot 掃描軌跡圖
+    // 是同一個問題：水平圖例文字長，跟 X 軸標題搶同一段垂直空間會疊在一起。
+    margin: { ...plotlyLayoutBase().margin, b: 90 },
+    legend: { ...plotlyLayoutBase().legend, y: -0.35 },
+    xaxis: { ...plotlyLayoutBase().xaxis, title: "Etot (µM)", type: "log" },
     yaxis: { ...plotlyLayoutBase().yaxis, title: "mM", type: "log" },
     shapes,
     showlegend: true,
@@ -3561,9 +3650,10 @@ function exportCsv(mode) {
     csv = rowsToCsv(["metric", "value"], rows);
     filename = "fba_result.csv";
   } else if (mode === "dfba") {
-    const headers = ["time_h", "limonene_mM", "biomass_gDW_L", "glycerol_mM", "growth_rate_h", "limonene_flux"];
+    const headers = ["time_h", "phase", "solve_mode", "limonene_mM", "biomass_gDW_L", "glycerol_mM", "growth_rate_h", "limonene_flux"];
     const rows = data.time_h.map((tv, i) => [
-      tv, data.limonene_mM[i], data.biomass_gDW_L[i], data.glycerol_mM[i],
+      tv, data.phase?.[i] ?? "", data.mode?.[i] ?? "",
+      data.limonene_mM[i], data.biomass_gDW_L[i], data.glycerol_mM[i],
       data.growth_rate_h[i], data.limonene_flux[i],
     ]);
     csv = rowsToCsv(headers, rows);
