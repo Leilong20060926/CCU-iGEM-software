@@ -68,12 +68,12 @@ If either command shows an error, install it first:
 
 **Option A — Using Git (recommended)**
 ```bash
-git clone https://gitlab.igem.org/2026/software/ccu-taiwan/limosim.git
+git clone https://github.com/Leilong20060926/CCU-iGEM-software.git
 cd limosim
 ```
 
 **Option B — Without Git**
-1. Go to https://gitlab.igem.org/2026/software/ccu-taiwan/limosim
+1. Go to https://github.com/Leilong20060926/CCU-iGEM-software.git
 2. Click the **Code** button → **Download source code** → **zip**
 3. Unzip the file, then open a terminal inside the unzipped folder (the one containing `main.py`).
 
