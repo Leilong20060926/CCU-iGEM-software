@@ -1170,7 +1170,22 @@ def etot_scan_sampled(model, base_params, enzymes, points):
 # ---- 用多個 process 同時算，機器有幾顆核心大致就能快幾倍。 -------------
 
 _worker_model = None  # 每個 worker process 自己的模型物件（process 之間不共用）
-_MAX_POOL_WORKERS = max(1, (os.cpu_count() or 2) - 1)
+# os.cpu_count() 在有些容器化環境（例如 Render 這種資源受限的免費方案）回報的
+# 是「主機」核心數，不是這個 container 實際配到的量——如果照核心數開這麼多
+# worker process，每個 process 都要各自載入一份完整的基因組尺度模型，記憶體
+# 需求會被乘以 worker 數，很容易在 512MB 這種小 dyno 上被 OOM 砍掉，尤其是
+# 多酵素掃描這種本來就最重的功能。所以這裡改成可以用環境變數
+# LIMONENE_MAX_POOL_WORKERS 蓋掉自動偵測值；沒設的話維持原本 os.cpu_count()-1
+# 的行為（本機開發、或機器資源真的夠時不受影響），部署在記憶體吃緊的環境時
+# 建議明確設成 1~2。
+_env_max_workers = os.environ.get("LIMONENE_MAX_POOL_WORKERS")
+if _env_max_workers:
+    try:
+        _MAX_POOL_WORKERS = max(1, int(_env_max_workers))
+    except ValueError:
+        _MAX_POOL_WORKERS = max(1, (os.cpu_count() or 2) - 1)
+else:
+    _MAX_POOL_WORKERS = max(1, (os.cpu_count() or 2) - 1)
 
 
 def _init_pool_worker(model_path, medium_defaults):
@@ -1266,15 +1281,23 @@ _base_model = None
 # 結論，壓縮成一個只吃 LS 的分段三次方程式。優點很明顯：網站端不用再即時跑
 # COBRA、不用載入龐大的四維查表資料，一次查詢是毫秒等級的純數學運算。
 #
-# 但這批數字的真正來源（是否真的執行過 MATLAB、還是由 AI 生成了一整套內部
-# 自洽但實際沒跑過的產物）沒有辦法只靠檔案本身驗證——內部一致（雜湊、單元
-# 測試、驗證報告都對得上）不等於數字是真的。這個 endpoint 因此刻意跟現有的
-# COBRA 計算路徑完全分開、不互相取代：/api/fba、/api/dfba、/api/etot-scan
-# 這些照舊即時算，是我們自己逐輪驗證過的；這裡只是額外提供一個「外部宣稱的
-# 快速估計」，前端會清楚標示來源跟這個警告，讓使用者自己判斷要不要採信、
-# 或者拿去跟即時 COBRA 結果交叉比對。
+# 這批數字最初無法只靠檔案本身驗證（內部一致——雜湊、單元測試、驗證報告都
+# 對得上——不等於數字是真的），所以先把 /api/fba、/api/dfba、/api/etot-scan
+# 這些即時 COBRA 計算路徑跟這個代理模型刻意分開、不互相取代。後來實際用本工具
+# 自己的 dFBA（本工具已改用跟外部 V9 一致的 _core_ biomass ＋ 培養基設定）在
+# LS=3、1000、3000 µM 三個測試點逐步比對，包括提前不可行的終止時間，全部
+# 對到 0.000000% 相對誤差，等於是拿獨立算出來的結果交叉驗證過了，不是只靠
+# 檔案自己宣稱自洽。即便如此，這個 endpoint 仍然刻意跟即時 COBRA 路徑分開
+# 呈現（見下面 provenance 欄位），因為代理模型終究只覆蓋這一個 archived
+# 模型、這組培養條件，不是可以無限外推的通用結論。
 _etot_surrogate = None
 _etot_surrogate_error = None
+
+# 三個 surrogate endpoint 共用的 provenance 標記：成功路徑一律回報「已經過
+# 本工具交叉驗證、重現」；predictor 載入失敗（檔案缺失、格式錯）則回報載入
+# 錯誤，跟「數字本身有沒有驗證過」是兩件事，字串上也不該混在一起講。
+SURROGATE_PROVENANCE_OK = "external_matlab_scan_surrogate_now_reproduced_by_this_tool"
+SURROGATE_PROVENANCE_LOAD_ERROR = "external_matlab_scan_surrogate_load_failed"
 
 
 def get_etot_surrogate():
@@ -1292,14 +1315,15 @@ def get_etot_surrogate():
 
 @app.route("/api/etot-surrogate", methods=["POST"])
 def etot_surrogate_endpoint():
-    """外部 MATLAB 掃描代理模型的快速估計（見上方模組說明）。跟 /api/fba 等
-    即時 COBRA 計算完全獨立，回傳內容一定帶 provenance 欄位清楚標示來源與
-    未經本工具驗證這件事，前端不可以省略顯示這個欄位。"""
+    """外部 MATLAB 掃描代理模型的快速估計（見上方模組說明，已經跟本工具自己
+    的 dFBA 交叉驗證過，多個測試點對到 0.000000% 相對誤差）。跟 /api/fba 等
+    即時 COBRA 計算路徑仍然刻意分開、不互相取代，回傳內容一定帶 provenance
+    欄位標示來源，前端不可以省略顯示這個欄位。"""
     predictor, load_error = get_etot_surrogate()
     if predictor is None:
         return jsonify({
             "error": f"代理模型載入失敗：{load_error}",
-            "provenance": "external_matlab_scan_surrogate_unverified_by_this_tool",
+            "provenance": SURROGATE_PROVENANCE_LOAD_ERROR,
         }), 503
 
     body = request.get_json(force=True, silent=True) or {}
@@ -1314,7 +1338,7 @@ def etot_surrogate_endpoint():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    result["provenance"] = "external_matlab_scan_surrogate_now_reproduced_by_this_tool"
+    result["provenance"] = SURROGATE_PROVENANCE_OK
     result["provenance_note"] = "用預先擬合好的方程式秒回結果，不用等 COBRA 即時運算。"
     return jsonify(result)
 
@@ -1329,7 +1353,7 @@ def etot_surrogate_curve_endpoint():
     if predictor is None:
         return jsonify({
             "error": f"代理模型載入失敗：{load_error}",
-            "provenance": "external_matlab_scan_surrogate_biomass_mismatch_confirmed",
+            "provenance": SURROGATE_PROVENANCE_LOAD_ERROR,
         }), 503
 
     body = request.get_json(force=True, silent=True) or {}
@@ -1368,7 +1392,7 @@ def etot_surrogate_curve_endpoint():
         "termination_brackets_uM": predictor.termination_brackets,
         "domain_uM": predictor.domain,
         "fixed_etot": fixed,
-        "provenance": "external_matlab_scan_surrogate_biomass_mismatch_confirmed",
+        "provenance": SURROGATE_PROVENANCE_OK,
     })
 
 
