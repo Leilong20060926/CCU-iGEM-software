@@ -1,0 +1,48 @@
+<header class="console__header">
+    <div class="header__title">
+      <img class="header__logo" src="/assets/logo.png" alt="Logo" onerror="this.style.display='none'">
+      <div>
+        <span class="header__eyebrow" data-i18n="eyebrow">iEC1356_Bl21DE3 · T7 誘導表現系統</span>
+        <h1>LimoSim</h1>
+        <p class="header__tagline" data-i18n="headerAccent">檸檬烯代謝模擬器</p>
+      </div>
+    </div>
+    <div class="header__right">
+      <div class="header__status" id="modelStatus">
+        <span class="dot dot--pending"></span> <span data-i18n="checking">檢查模型中…</span>
+      </div>
+      <div class="header__nav-pills">
+        <button class="pill-btn" id="navInfoBtn" type="button" data-i18n="navInfo">相關資訊</button>
+        <button class="pill-btn" id="navAboutBtn" type="button" data-i18n="navAbout">關於我們</button>
+      </div>
+      <div class="lang-toggle" id="uiModeToggle">
+        <button class="lang-toggle__btn is-active" data-uimode="simple" data-i18n="uiModeSimple">簡易</button>
+        <button class="lang-toggle__btn" data-uimode="advanced" data-i18n="uiModeAdvanced">進階</button>
+      </div>
+      <div class="lang-toggle" id="langToggle">
+        <button class="lang-toggle__btn" data-lang="zh">中</button>
+        <button class="lang-toggle__btn is-active" data-lang="en">EN</button>
+      </div>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">
+        <img id="themeToggleIcon" src="/assets/sun.svg" alt="" onerror="this.style.display='none'">
+      </button>
+    </div>
+  </header>
+  <nav class="mode-tabs" id="modeTabs">
+    <button class="mode-tab is-active" data-mode="fba">
+      <span class="mode-tab__label">FBA</span>
+      <span class="mode-tab__desc" data-i18n="modeFbaDesc">單一時間點穩態通量</span>
+    </button>
+    <button class="mode-tab" data-mode="dfba">
+      <span class="mode-tab__label">dFBA</span>
+      <span class="mode-tab__desc" data-i18n="modeDfbaDesc">誘導後動態時間序列</span>
+    </button>
+    <button class="mode-tab" data-mode="scan">
+      <span class="mode-tab__label" data-i18n="modeScanLabel">Etot 分析</span>
+      <span class="mode-tab__desc" data-i18n="modeScanDesc">單酵素掃描／自動最佳化／快速估計</span>
+    </button>
+    <button class="mode-tab" data-mode="scan2d">
+      <span class="mode-tab__label" data-i18n="modeScan2dLabel">多酵素掃描</span>
+      <span class="mode-tab__desc" data-i18n="modeScan2dDesc">2~4 酵素交叉掃描</span>
+    </button>
+  </nav>

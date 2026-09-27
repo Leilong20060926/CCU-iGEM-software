@@ -1,0 +1,180 @@
+<!-- ============ Related info ============ -->
+  <section class="info-page" id="infoPage" hidden>
+    <div class="info-page__header">
+      <button class="pill-btn" id="infoBackBtn" type="button">
+        <span data-i18n="navBack">← 返回</span>
+      </button>
+      <h1 data-i18n="navInfo">相關資訊</h1>
+      <div class="info-page__header-right">
+        <div class="lang-toggle" id="langToggleInfo">
+          <button class="lang-toggle__btn" data-lang="zh">中</button>
+          <button class="lang-toggle__btn is-active" data-lang="en">EN</button>
+        </div>
+        <button class="theme-toggle" id="themeToggleInfo" type="button" aria-label="Toggle theme">
+          <img class="theme-toggle-icon-mirror" src="/assets/sun.svg" alt="" onerror="this.style.display='none'">
+        </button>
+      </div>
+    </div>
+    <div class="info-page__body">
+      <div class="info-block">
+        <h2 data-i18n="info1Title">1. 為什麼要用 COBRA：先在電腦裡跑一次，省下 Wet-Lab 的時間</h2>
+        <p data-i18n="info1Body1">為了節省 Wet-Lab 實際操作與試錯的成本，我們用 COBRA 模擬大腸桿菌生產檸檬烯時的代謝通量，讓「細胞工廠」先在電腦裡運轉過一輪，再決定真正值得優先測試的實驗方向。</p>
+        <p data-i18n="info1Body2">一個細胞同時進行著數千條化學反應：碳源被吸收後，可能用於生長、產生能量、製造副產物，也可能流入我們想建立的檸檬烯生合成路徑。只看單一基因或酵素，往往無法預測整個細胞最後怎麼分配資源，所以我們用 COBRA Toolbox 分析大腸桿菌的基因體尺度代謝模型。</p>
+        <p data-i18n="info1Body3">COBRA 是 Constraint-Based Reconstruction and Analysis（限制式重建與分析）的縮寫。它不是單一模型，也不等同於 FBA，而是一整套在 MATLAB 中操作、修改與分析代謝網路的方法集合，可用於研究微生物、人體代謝、微生物群落與生物製程，並支援模型重建、通量分析、基因剔除、菌株設計、資料整合與網路視覺化。本網頁工具是同一套分析邏輯的 Python／cobrapy 重新實作版本。</p>
+        <a class="info-link" href="https://opencobra.github.io/cobratoolbox/" target="_blank" rel="noopener" data-i18n="info1Link">COBRA Toolbox 官方網站 →</a>
+      </div>
+
+      <div class="info-block">
+        <h2 data-i18n="info10Title">2. 模型與參數來源</h2>
+        <p data-i18n="info10Body1">代謝模型基礎為大腸桿菌基因體尺度模型 iEC1356_Bl21DE3，異源路徑與培養基／誘導參數的設定邏輯整理自團隊內部的 LimoneneCOBRA 系列腳本（MATLAB COBRA Toolbox 版本），本網頁工具是同一套邏輯的 Python／cobrapy 重新實作版本。</p>
+        <p data-i18n="info10Body2">培養基與 biomass 目標反應目前對齊到 LimoneneCOBRA 系列後期採用的 V9 設定（biomass 使用 BIOMASS_Ec_iJO1366_core_53p95M，胺基酸均勻攝取而非按比例分配）；「快速估計」分頁用的方程式與其結構稽核（DXS/IDI/GPPS 對這個模型的可行解沒有影響）則來自團隊另一條獨立的 MATLAB 稽核／驗證流程。</p>
+        <a class="info-link-row" href="https://opencobra.github.io/cobratoolbox/" target="_blank" rel="noopener">
+          <span data-i18n="info10LinkToolbox">COBRA Toolbox 官方網站</span><span class="info-link-row__arrow">→</span>
+        </a>
+        <a class="info-link-row" href="https://www.nature.com/articles/s41596-018-0098-2" target="_blank" rel="noopener">
+          <span data-i18n="info10LinkPaper">Heirendt et al., 2019, Nature Protocols（COBRA Toolbox v3.0）</span><span class="info-link-row__arrow">→</span>
+        </a>
+        <a class="info-link-row" href="https://opencobra.github.io/cobratoolbox/stable/modules/analysis/dynamicFBA/" target="_blank" rel="noopener">
+          <span data-i18n="info10LinkDfba">COBRA dynamicFBA 官方文件</span><span class="info-link-row__arrow">→</span>
+        </a>
+      </div>
+      <div class="info-block">
+        <h2 data-i18n="info2Title">3. FBA：在一個時間點詢問細胞「能做什麼」</h2>
+        <p data-i18n="info2Body1">通量平衡分析（Flux Balance Analysis, FBA）研究代謝通量，也就是物質通過每條反應的速率，主要採用三類資訊：每條反應消耗與產生哪些物質；反應的方向及速率上下限；一個要最佳化的目標（例如生長最快、或檸檬烯產率最高）。</p>
+        <p data-i18n="info2Body2">核心條件通常寫成 Sv = 0，其中 S 是代謝網路的化學計量矩陣，v 是所有反應的通量——表示在所分析的瞬間，細胞內中間代謝物的產生與消耗大致平衡。</p>
+        <p><strong data-i18n="info2ListTitle">在本專案中，FBA 可以回答：</strong></p>
+        <ul>
+          <li data-i18n="info2Li1">在指定培養基中，細胞是否能夠生長？</li>
+          <li data-i18n="info2Li2">新加入的檸檬烯路徑在化學計量上是否可行？</li>
+          <li data-i18n="info2Li3">理論上最多能產生多少檸檬烯？</li>
+          <li data-i18n="info2Li4">碳源、氧氣或某條反應受到限制時，結果如何改變？</li>
+          <li data-i18n="info2Li5">碳流可能經過哪些路徑？</li>
+          <li data-i18n="info2Li6">細胞生長與產品生產之間是否存在取捨？</li>
+        </ul>
+        <p data-i18n="info2Body3">FBA 的優勢是不用取得每一種酵素的完整動力學資料，就能分析數千條反應；但它給出的是特定條件下的「代謝快照」，本身不描述濃度隨時間的變化——本工具的「FBA」分頁做的正是這件事：在你設定的培養基與酵素量下，求一次快照。</p>
+        <a class="info-link" href="https://opencobra.github.io/cobratoolbox/stable/tutorials/" target="_blank" rel="noopener" data-i18n="info2Link">COBRA Toolbox 教學文件（含 FBA） →</a>
+      </div>
+
+      <div class="info-block">
+        <h2 data-i18n="info3Title">4. 不只一個答案：從單一解到完整的可能範圍</h2>
+        <p data-i18n="info3Body1">單次 FBA 可能只回傳其中一個最佳解，但細胞往往有多條路徑能達成相同目標，所以還需要其他分析方法，才能看到「解的範圍」而不只是「一個解」。</p>
+        <div class="info-table-wrap">
+          <table class="info-table">
+            <thead>
+              <tr>
+                <th data-i18n="info3ColMethod">方法</th>
+                <th data-i18n="info3ColQuestion">可以回答的問題</th>
+                <th data-i18n="info3ColMeaning">對本專案的意義</th>
+                <th data-i18n="info3ColTool">本工具對應</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>FBA</td>
+                <td data-i18n="info3Q1">在目前條件下能否生長或生產？理論最大通量是多少？</td>
+                <td data-i18n="info3M1">確認檸檬烯路徑能否與 BL21(DE3) 原有代謝網路連接</td>
+                <td data-i18n="info3T1">「FBA」分頁</td>
+              </tr>
+              <tr>
+                <td data-i18n="info3MethodFVA">通量變異分析（FVA）</td>
+                <td data-i18n="info3Q2">在維持相同目標時，每條反應可能落在哪個範圍？</td>
+                <td data-i18n="info3M2">區分必要反應、替代路徑與不確定通量</td>
+                <td data-i18n="info3T2">目前只用在內部驗證，尚未開放成獨立分頁</td>
+              </tr>
+              <tr>
+                <td data-i18n="info3MethodEnv">生產包絡線</td>
+                <td data-i18n="info3Q3">固定不同生長速率後，產品的最低與最高產率是多少？</td>
+                <td data-i18n="info3M3">顯示生長與檸檬烯生產的取捨，判斷產品是否與生長耦合</td>
+                <td data-i18n="info3T3">對應「自動最佳化」在不同生長下限找最佳解的概念</td>
+              </tr>
+              <tr>
+                <td data-i18n="info3MethodCap">酵素容量限制</td>
+                <td data-i18n="info3Q4">某條反應是否受酵素數量或催化速率限制？</td>
+                <td data-i18n="info3M4">以 Vmax = kcat × Etot 限制 GPPS、LS 等反應</td>
+                <td data-i18n="info3T4">「Etot 分析」與「多酵素掃描」左側的酵素總濃度輸入</td>
+              </tr>
+              <tr>
+                <td data-i18n="info3MethodScan">參數掃描</td>
+                <td data-i18n="info3Q5">改變誘導時間、培養基或酵素量時，哪些變數最重要？</td>
+                <td data-i18n="info3M5">把大量可能的實驗條件縮小成值得優先測試的範圍</td>
+                <td data-i18n="info3T5">「Etot 分析」（手動掃描／自動最佳化／快速估計）與「多酵素掃描」</td>
+              </tr>
+              <tr>
+                <td>dFBA</td>
+                <td data-i18n="info3Q6">生物量、營養與產品何時改變？何時耗盡或停止生產？</td>
+                <td data-i18n="info3M6">模擬培養與 IPTG 誘導的完整時間歷程</td>
+                <td data-i18n="info3T6">「dFBA」分頁</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p data-i18n="info3Body2">COBRA Toolbox 也提供基因／反應剔除、OptKnock、OptForce、通量取樣與多體學資料整合等工具，未來可以進一步用來尋找可能提升檸檬烯生產的改造策略——這些目前還不在本工具的功能範圍內。</p>
+      </div>
+
+      <div class="info-block">
+        <h2 data-i18n="info4Title">5. dFBA：把代謝快照串成培養過程</h2>
+        <p data-i18n="info4Body1">動態通量平衡分析（Dynamic Flux Balance Analysis, dFBA）在每個時間步驟重新執行一次 FBA，再依照預測到的攝取、生長與分泌通量，更新培養液中的營養濃度、細胞生物量、副產物與目標產品的累積量，以及下一個時間點可用的反應上限。</p>
+        <p><strong data-i18n="info4ListTitle">因此，dFBA 能回答 FBA 無法直接回答的時間問題：</strong></p>
+        <ul>
+          <li data-i18n="info4Li1">甘油會在什麼時候耗盡？</li>
+          <li data-i18n="info4Li2">IPTG 應在生長早期、對數期還是稍晚加入？</li>
+          <li data-i18n="info4Li3">誘導後，細胞會優先繼續生長，還是把碳流轉向檸檬烯？</li>
+          <li data-i18n="info4Li4">磷酸鹽、胺基酸或氧氣何時可能成為限制？</li>
+          <li data-i18n="info4Li5">檸檬烯生產何時開始、何時停止，最終累積多少？</li>
+        </ul>
+        <p data-i18n="info4Body2">需要特別說明的是，dFBA 並沒有完全取消 Sv = 0，它通常仍假設每個短時間步驟內的細胞內代謝處於準穩態，只是培養液、細胞量與邊界條件會隨時間更新。COBRA Toolbox 內建的 dynamicFBA 也是採用逐步重解 FBA 的靜態最佳化方法——本工具的 dFBA 引擎在每一步都用 pFBA（parsimonious FBA）求解，並用跟 COBRA dynamicFBA 相同的解析質量平衡公式積分生物量與濃度，這也是本工具能跟外部 MATLAB 結果對到 0.000000% 相對誤差的原因之一。</p>
+        <a class="info-link" href="https://opencobra.github.io/cobratoolbox/stable/modules/analysis/dynamicFBA/" target="_blank" rel="noopener" data-i18n="info4Link">COBRA dynamicFBA 官方文件 →</a>
+      </div>
+
+      <div class="info-block">
+        <h2 data-i18n="info5Title">6. T7 誘導表現系統與 IPTG 誘導原理</h2>
+        <p data-i18n="info5Body">本專案使用的異源檸檬烯合成路徑（DXS、IDI、GPPS、LS）由 T7 啟動子控制，平常受 lac 阻遏蛋白抑制、幾乎不表現；加入 IPTG 後阻遏蛋白被解除，酵素表現量隨時間逐漸提升（誘導斜坡），直到達到穩定的誘導後表現量。模擬裡的「IPTG 加入時間」與「誘導斜坡時間」對應的就是這個生物學機制；本工具預設的誘導時間（4 小時）與模擬總長（25 小時）沿用團隊 LimoneneCOBRA 系列腳本一路驗證下來的設定。</p>
+      </div>
+
+      <div class="info-block">
+        <h2 data-i18n="info6Title">7. 檸檬烯生合成路徑</h2>
+        <p data-i18n="info6Body">路徑大致是：MEP 路徑（DXS 等原生／異源酵素）產生異戊烯焦磷酸（IPP）與其異構物 DMAPP → IDI 讓兩者互相轉換 → GPPS 把 IPP/DMAPP 縮合成香葉基焦磷酸（GPP）→ 檸檬烯合成酶（LS）把 GPP 轉成檸檬烯後分泌到胞外。DXS、IDI、GPPS、LS 這四個酵素的總濃度（Etot），就是左側「酵素總濃度」欄位、以及「Etot 分析」／「多酵素掃描」要調的東西。</p>
+      </div>
+
+      <div class="info-block">
+        <h2 data-i18n="info7Title">8. COBRA 對我們檸檬烯專案的具體貢獻</h2>
+        <p data-i18n="info7Intro">我們以大腸桿菌 BL21(DE3) 的基因體尺度模型為底圖，加入受 T7／IPTG 誘導控制的代謝改造，以及由 GPP 通往檸檬烯的 GPPS–LS 生合成路徑，讓我們能在真正培養細胞以前，先建立一座可測試的「數位細胞工廠」。目前模型主要帶來五項貢獻：</p>
+        <ul>
+          <li><strong data-i18n="info7Li1Lead">確認路徑是否完整可行——</strong><span data-i18n="info7Li1Body">模型可檢查碳源能否經由中央代謝、MEP 路徑、GPP，最後轉換並排出檸檬烯，避免只看基因清單而忽略全細胞的物質平衡。</span></li>
+          <li><strong data-i18n="info7Li2Lead">建立生長與生產的共同尺度——</strong><span data-i18n="info7Li2Body">不只計算「有沒有檸檬烯通量」，也比較不同生長速率下可能達到的檸檬烯產率，讓生長與生產之間的競爭可以被量化。</span></li>
+          <li><strong data-i18n="info7Li3Lead">找出「增加碳源不一定增加產品」的原因——</strong><span data-i18n="info7Li3Body">模擬顯示，在目前參數設定下，單純增加甘油並不必然提高檸檬烯產量；進一步的上限與包絡分析指出 LS 反應會先碰到設定的容量上限，而其他受測酵素尚未達上限，這使研究方向從「繼續增加碳源」轉向「確認 LS 的實際催化能力與表現量」。</span></li>
+          <li><strong data-i18n="info7Li4Lead">把 IPTG 誘導納入時間模型——</strong><span data-i18n="info7Li4Body">擴充 dFBA，使模型能區分誘導前與誘導後的酵素表現，並追蹤生物量、甘油、磷酸鹽、胺基酸與檸檬烯隨時間的變化，誘導時間因而不再只是經驗選擇，而能先透過模擬縮小實驗範圍。</span></li>
+          <li><strong data-i18n="info7Li5Lead">決定下一個最值得做的實驗——</strong><span data-i18n="info7Li5Body">Etot 掃描能顯示預測對酵素量有多敏感；但要進一步區分「LS 數量不足」、「LS 的 kcat 太低」或「GPP 供應不連續」，仍需要實測 LS 的酵素量，並加入或量測 GPP 濃度與 Michaelis–Menten 飽和效應——模型的價值就在於指出哪些量測最能消除目前的不確定性。</span></li>
+        </ul>
+      </div>
+
+      <div class="info-block">
+        <h2 data-i18n="info8Title">9. 我們如何看待模型結果</h2>
+        <p data-i18n="info8Body1">COBRA 模型不是細胞的完美複製，也不是實驗的替代品。它的所有結論都應理解為：在目前代謝網路、培養條件、反應上下限與最佳化假設之下，細胞可能呈現的行為。</p>
+        <p data-i18n="info8Body2">傳統 FBA 不會自動描述基因調控、酵素合成延遲、細胞毒性、氧氣傳質或細胞內代謝物濃度；這些因素必須透過額外限制、動力學方程或實驗資料加入。特別是 GPP 等細胞內濃度，不能僅由一般 dFBA 的胞外濃度更新直接得到。</p>
+        <p data-i18n="info8Body3">因此，COBRA 對本專案最重要的貢獻，不是宣稱它已經知道細胞的唯一答案，而是把模糊的生物學直覺轉換成可計算、可比較、也可被實驗推翻的問題：檸檬烯能不能被製造？理論上能製造多少？限制發生在哪裡？何時發生？以及我們下一步最應該量測什麼？</p>
+      </div>
+
+      <div class="info-block">
+        <h2 data-i18n="info9Title">10. 模型的演進：從 Limonene001 到快速估計方程式</h2>
+        <p data-i18n="info9Intro">「能否讓改造過的大腸桿菌一邊產檸檬烯、一邊維持自己的生長？」這個問題催生了一系列模型（LimoneneCOBRA001–009），每一版都針對前一版留下的限制做調整——從加入路徑、加上時間軸，到把酵素量變成可以掃描的變數。以下是精簡版的演進紀錄：</p>
+        <ul>
+          <li><strong data-i18n="info9V1Lead">Limonene001</strong><span data-i18n="info9V1Body"> — 在 iEC1356 模型裡加入異源 GPPS、LS（Mentha spicata 檸檬烯合成酶）反應與胞外運輸，做第一次靜態 FBA，只有一張「快照」，沒有時間軸。</span></li>
+          <li><strong data-i18n="info9V2Lead">Limonene002</strong><span data-i18n="info9V2Body"> — 加入 dFBA 與 IPTG 誘導開關，讓表現量在誘導後隨時間上升，並用「T7 burden」反應把強制表現的 ATP 成本算進去。</span></li>
+          <li><strong data-i18n="info9V3Lead">Limonene003</strong><span data-i18n="info9V3Body"> — 明確定義培養基（M9-like，甘油／氨／磷酸鹽／鹽類／氧氣各給明確攝取上限），不再讓模型預設可以吃任何東西。</span></li>
+          <li><strong data-i18n="info9V4Lead">Limonene004</strong><span data-i18n="info9V4Body"> — 把兩階段目標（先衝產物、再衝生長）簡化成一階段（在最低生長限制下直接衝產物），生長下限提高到 10%。</span></li>
+          <li><strong data-i18n="info9V5Lead">Limonene005</strong><span data-i18n="info9V5Body"> — 培養基換成 TB-like 豐富培養基（用胺基酸攝取代表 tryptone/yeast extract 的貢獻），並固定生長速率以便公平比較不同培養基。</span></li>
+          <li><strong data-i18n="info9V6Lead">Limonene006</strong><span data-i18n="info9V6Body"> — 加入通量變異分析（FVA），在每個模擬狀態同時算出「最小可行」與「最大可行」的檸檬烯通量範圍，不只看單一被選中的解。</span></li>
+          <li><strong data-i18n="info9V7Lead">Limonene007</strong><span data-i18n="info9V7Body"> — 把粗略的反應上限，換成用 kcat × Etot 算出來的酵素容量，DXS／IDI／GPPS／LS 各自有自己受 T7 控制的複製反應。</span></li>
+          <li><strong data-i18n="info9V8Lead">Limonene008</strong><span data-i18n="info9V8Body"> — 把整個模擬包成可重複呼叫的函式，誘導時間、初始條件、模擬長度都能當參數帶入，不用每次改程式碼；甘油／氧氣攝取上限也開始參數化。</span></li>
+          <li><strong data-i18n="info9V9Lead">2026 年 7 月的包絡線研究</strong><span data-i18n="info9V9Body"> — 比較「只開 LS」跟「開全部工程酵素」兩種設定下的生產包絡線，指出低 LS Vmax 是當時設定下的瓶頸。</span></li>
+          <li><strong data-i18n="info9V10Lead">Limonene009</strong><span data-i18n="info9V10Body"> — 把固定 Vmax 換成「kcat × Etot（可調的酵素總濃度）」，DXS／IDI／GPPS／LS 從此可以被單獨掃描；生長下限也改成參照「當下動態狀態」，不再固定用最初的最大生長速率。</span></li>
+          <li><strong data-i18n="info9V11Lead">V9 延伸版</strong><span data-i18n="info9V11Body"> — 記錄每一步實際用到的通量與容量上限，畫出「容量利用率」，並用 FVA／通量取樣在完成模擬的某個時間點重建真正的邊界條件，而不是拿誘導前的模型硬套。</span></li>
+          <li><strong data-i18n="info9V12Lead">2026 年 9 月的成果庫</strong><span data-i18n="info9V12Body"> — 把 V9 累積的 2,382 筆 MATLAB dFBA 紀錄，壓縮成一組只吃 LS Etot 的分段三次方程式，另外用 2,048 筆全新四維獨立採樣點驗證，最大相對誤差 0.8295%——這就是本工具「快速估計」分頁背後的那套方程式。</span></li>
+        </ul>
+        <p data-i18n="info9Verify">「快速估計」上線後，我們另外用本工具自己的 dFBA 引擎（跟外部 V9 對齊同一套 biomass 目標反應與培養基設定）在 LS = 3、1000、3000 µM 三個測試點重新驗證了這套方程式——直接跑一次即時 dFBA、逐格比對數值與提前終止的時間，結果完全一致（相對誤差 0.000000%），包括 LS = 3000 µM 那組提前於 13.5 小時判定不可行的終止時間點也精確吻合。這代表「快速估計」不只是外部宣稱自洽，本工具自己也拿獨立跑出來的數字對照過一次。</p>
+        <div class="info-caveat" data-i18n="info9Caveat">這個結論適用於這一個 archived 模型、這一組模擬條件，不代表 DXS、IDI、GPPS 在真實生物系統裡永遠不重要——只是在這個特定的計算模型與培養基設定下，它們的攝取／容量上限鬆到不會卡住任何最佳解。</div>
+      </div>
+
+    </div>
+  </section>

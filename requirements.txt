@@ -3,7 +3,8 @@ cobra>=0.29
 scipy>=1.10
 gunicorn>=21.2
 
-# 建議裝：換更快的 LP solver，裝了會自動啟用（FBA/dFBA/掃描全部都會變快）。
-# 如果之後需要跟 MATLAB／GLPK 逐位對齊，設環境變數 LIMONENE_FAST_SOLVER=0
-# 可以停用、強制退回 GLPK。
+# Recommended: switches to a much faster LP solver, enabled automatically
+# once installed (speeds up FBA/dFBA/scans across the board). If you later
+# need bit-for-bit alignment with MATLAB/GLPK, set the environment variable
+# LIMONENE_FAST_SOLVER=0 to disable it and force GLPK.
 highspy>=1.5

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="pageTitle">LimoSim · 檸檬烯代謝模擬器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="console">
+
+  <div id="mainView">
+{% include "partials/header.html" %}
+
+  <main class="layout">
+
+{% include "partials/params_panel.html" %}
+
+{% include "partials/results_panel.html" %}
+  </main>
+  </div>
+
+{% include "partials/info_page.html" %}
+
+{% include "partials/about_page.html" %}
+
+</div>
+
+<script src="js/i18n.js"></script>
+<script src="js/core.js"></script>
+<script src="js/ui-bindings.js"></script>
+<script src="js/run-fba-dfba.js"></script>
+<script src="js/run-scan.js"></script>
+<script src="js/run-surrogate-optimize.js"></script>
+<script src="js/presets-export-utils.js"></script>
+</body>
+</html>

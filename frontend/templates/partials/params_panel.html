@@ -1,0 +1,244 @@
+<!-- ============ Left side: parameter panel ============ -->
+    <section class="panel panel--controls">
+
+      <div class="banner banner--intro" id="simpleIntroPanel" hidden>
+        <strong data-i18n="simpleIntroTitle">這個工具在做什麼？</strong>
+        <p data-i18n="simpleIntroBody1">調整下面「酵素總濃度 Etot」的數字，工具會幫你估計：如果讓大腸桿菌製造這些量的酵素，最後大概能產出多少檸檬烯（可用來驅趕稻米害蟲二化螟的天然物質）。</p>
+        <p data-i18n="simpleIntroBody2">不需要懂任何生化模擬背景，改數字、按下方「開始運算」就會看到估計結果。</p>
+      </div>
+
+      <div class="field-group">
+        <h2 class="field-group__title" data-i18n="presetTitle">參數預設集（本機儲存）</h2>
+        <div class="preset-row" style="margin-bottom: 8px;">
+          <select id="presetSelect">
+            <option value="" data-i18n="presetNone">— 選擇已儲存的預設 —</option>
+          </select>
+        </div>
+        <div class="preset-row">
+          <input type="text" id="presetName" data-i18n-placeholder="presetNamePlaceholder" placeholder="預設名稱">
+          <button class="btn-sm" id="presetSaveBtn" data-i18n="presetSave">儲存</button>
+        </div>
+        <div class="btn-row" style="margin-top: 8px;">
+          <button class="btn-sm" id="presetLoadBtn" data-i18n="presetLoad">載入</button>
+          <button class="btn-sm" id="presetDeleteBtn" data-i18n="presetDelete">刪除</button>
+          <button class="btn-sm" id="shareLinkBtn" data-i18n="shareLink">複製分享連結</button>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <h2 class="field-group__title" data-i18n="etotTitle">酵素總濃度 Etot (µM)</h2>
+        <p class="hint" id="etotSimpleHint" data-i18n="etotSimpleHint" hidden>DXS、IDI、GPPS、LS 是負責合成檸檬烯的四種酵素，其中 LS 影響最大；其他三個先維持預設值也沒關係。</p>
+        <div class="field" data-enzyme="DXS">
+          <label for="etot-DXS">DXS</label>
+          <input type="number" id="etot-DXS" step="0.01" min="0">
+        </div>
+        <div class="field" data-enzyme="IDI">
+          <label for="etot-IDI">IDI</label>
+          <input type="number" id="etot-IDI" step="0.01" min="0">
+        </div>
+        <div class="field" data-enzyme="GPPS">
+          <label for="etot-GPPS">GPPS</label>
+          <input type="number" id="etot-GPPS" step="0.01" min="0">
+        </div>
+        <div class="field" data-enzyme="LS">
+          <label for="etot-LS" data-i18n="lsLabel">LS（檸檬烯合成酶）</label>
+          <input type="number" id="etot-LS" step="0.01" min="0">
+        </div>
+      </div>
+
+      <div class="field-group" id="mediumFieldGroup">
+        <h2 class="field-group__title" data-i18n="mediumTitle">培養基與路徑邊界（可調）</h2>
+        <div class="field">
+          <label for="glycerolUptake" data-i18n="glycerolUptakeLabel">甘油攝取上限 (mmol/gDW/h)</label>
+          <input type="number" id="glycerolUptake" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="oxygenUptake" data-i18n="oxygenUptakeLabel">氧氣攝取上限 (mmol/gDW/h)</label>
+          <input type="number" id="oxygenUptake" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="aaUptake" data-i18n="aaUptakeLabel">豐富培養基胺基酸攝取上限 (mmol/gDW/h)</label>
+          <input type="number" id="aaUptake" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="atpmLb" data-i18n="atpmLbLabel">ATPM 維持能量下限 (mmol/gDW/h)</label>
+          <input type="number" id="atpmLb" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="dxpsUb" data-i18n="dxpsUbLabel">DXPS 上限（MEP 路徑）</label>
+          <input type="number" id="dxpsUb" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="metatUb" data-i18n="metatUbLabel">METAT 上限</label>
+          <input type="number" id="metatUb" step="0.01" min="0">
+        </div>
+        <div class="field">
+          <label for="fppsUb" data-i18n="fppsUbLabel">FPPS 上限（knock-down 目標）</label>
+          <input type="number" id="fppsUb" step="0.01" min="0">
+        </div>
+        <p class="hint" data-i18n="nativeBoundsHint">DXPS／METAT／FPPS 若模型中沒有對應反應會自動略過。</p>
+      </div>
+
+      <div class="field-group" id="scanFieldGroup" hidden>
+        <h2 class="field-group__title" data-i18n="scanTitle">掃描設定</h2>
+        <div class="field" id="scanSubModeField">
+          <label for="scanSubMode" data-i18n="scanSubModeLabel">分析方式</label>
+          <select id="scanSubMode">
+            <option value="manual" data-i18n="scanSubModeManual">手動掃描（指定範圍）</option>
+            <option value="optimize" data-i18n="scanSubModeOptimize">自動最佳化（Nelder-Mead）</option>
+            <option value="surrogate" data-i18n="scanSubModeSurrogate" selected>快速估計（外部代理模型）</option>
+          </select>
+        </div>
+        <div id="scanManualFields">
+          <div class="field">
+            <label for="scanEnzyme" data-i18n="scanEnzymeLabel">掃描酵素</label>
+            <select id="scanEnzyme">
+              <option value="DXS">DXS</option>
+              <option value="IDI">IDI</option>
+              <option value="GPPS">GPPS</option>
+              <option value="LS" selected>LS</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="scanValues" data-i18n="scanValuesLabel">倍率／濃度序列 (µM，以逗號分隔)</label>
+            <input type="text" id="scanValues" placeholder="0.03, 0.3, 3, 30, 300">
+            <p class="hint" data-i18n="scanLogHint">結果圖表的 X 軸會用對數座標顯示，數值差距很大時比較容易一次看清楚。</p>
+          </div>
+        </div>
+        <div id="scanOptimizeFields" hidden>
+          <div class="field">
+            <label for="optimizeMaxIter" data-i18n="optimizeMaxIterLabel">最大迭代次數</label>
+            <input type="number" id="optimizeMaxIter" step="10" min="50" max="600" value="200">
+          </div>
+          <p class="hint" data-i18n="optimizeHint">從目前 Etot 欄位的數值開始搜尋，用穩態 FBA（非 dFBA）當目標函數，找出讓限烯烴通量最大化的 Etot(DXS/IDI/GPPS/LS) 組合。次數越多越準，但也越慢。</p>
+        </div>
+        <div id="scanSurrogateFields" hidden>
+          <div class="banner banner--info" data-i18n="surrogateWarning">用預先擬合好的方程式秒回結果，不用等 COBRA 即時運算。</div>
+          <p class="hint" data-i18n="surrogateUsesSharedEtotP1">直接使用左上方「酵素總濃度 Etot」欄位目前填的四個數值（DXS/IDI/GPPS/LS），跟其他分頁共用同一組輸入，不用另外填。</p>
+          <p class="hint" data-i18n="surrogateUsesSharedEtotP2">注意這裡的可用範圍比較窄：DXS/IDI/GPPS 是 0.001–1000 µM，LS 是 0.003–30000 µM，超出範圍會直接報錯。</p>
+        </div>
+      </div>
+
+      <div class="field-group" id="scan2dFieldGroup" hidden>
+        <h2 class="field-group__title" data-i18n="scan2dTitle">多酵素掃描設定</h2>
+        <div class="field">
+          <label for="scanStrategy" data-i18n="scanStrategyLabel">掃描策略</label>
+          <select id="scanStrategy">
+            <option value="grid" data-i18n="scanStrategyGrid">窮舉網格</option>
+            <option value="lhs" data-i18n="scanStrategyLhs">LHS 取樣（Latin Hypercube）</option>
+            <option value="sobol" data-i18n="scanStrategySobol">Sobol 序列（低差異準隨機）</option>
+          </select>
+        </div>
+        <div class="field" id="scanNSamplesField" hidden>
+          <label for="scanNSamples" data-i18n="scanNSamplesLabel">取樣點數</label>
+          <input type="number" id="scanNSamples" step="5" min="5" max="500" value="50">
+        </div>
+        <p class="hint" id="scanStrategyHint" data-i18n="scanStrategyGridHint">用你填的每個酵素候選值做完整交叉組合，格點數 = 各酵素候選值個數相乘。</p>
+        <div class="field">
+          <label for="scanMultiCount" data-i18n="scanMultiCountLabel">掃描酵素數量</label>
+          <select id="scanMultiCount">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="scanEnzymeX" data-i18n="scanEnzymeXLabel">X 軸酵素</label>
+          <select id="scanEnzymeX">
+            <option value="DXS">DXS</option>
+            <option value="IDI">IDI</option>
+            <option value="GPPS">GPPS</option>
+            <option value="LS" selected>LS</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="scanValuesX" id="scanValuesXLabelEl" data-i18n="scanValuesXLabel">X 軸濃度序列 (µM，以逗號分隔)</label>
+          <input type="text" id="scanValuesX" placeholder="0.03, 0.3, 3, 30, 300">
+        </div>
+        <div class="field">
+          <label for="scanEnzymeY" data-i18n="scanEnzymeYLabel">Y 軸酵素</label>
+          <select id="scanEnzymeY">
+            <option value="DXS" selected>DXS</option>
+            <option value="IDI">IDI</option>
+            <option value="GPPS">GPPS</option>
+            <option value="LS">LS</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="scanValuesY" id="scanValuesYLabelEl" data-i18n="scanValuesYLabel">Y 軸濃度序列 (µM，以逗號分隔)</label>
+          <input type="text" id="scanValuesY" placeholder="0.03, 0.3, 3, 30, 300">
+        </div>
+        <div class="field" id="scanEnzymeZField" hidden>
+          <label for="scanEnzymeZ" data-i18n="scanEnzymeZLabel">第 3 個酵素</label>
+          <select id="scanEnzymeZ">
+            <option value="DXS">DXS</option>
+            <option value="IDI" selected>IDI</option>
+            <option value="GPPS">GPPS</option>
+            <option value="LS">LS</option>
+          </select>
+        </div>
+        <div class="field" id="scanValuesZField" hidden>
+          <label for="scanValuesZ" id="scanValuesZLabelEl" data-i18n="scanValuesZLabel">第 3 個酵素濃度序列 (µM，以逗號分隔)</label>
+          <input type="text" id="scanValuesZ" placeholder="0.03, 0.3, 3, 30, 300">
+        </div>
+        <div class="field" id="scanEnzymeWField" hidden>
+          <label for="scanEnzymeW" data-i18n="scanEnzymeWLabel">第 4 個酵素</label>
+          <select id="scanEnzymeW">
+            <option value="DXS">DXS</option>
+            <option value="IDI">IDI</option>
+            <option value="GPPS" selected>GPPS</option>
+            <option value="LS">LS</option>
+          </select>
+        </div>
+        <div class="field" id="scanValuesWField" hidden>
+          <label for="scanValuesW" id="scanValuesWLabelEl" data-i18n="scanValuesWLabel">第 4 個酵素濃度序列 (µM，以逗號分隔)</label>
+          <input type="text" id="scanValuesW" placeholder="0.03, 0.3, 3, 30, 300">
+        </div>
+        <p class="hint" id="scanMultiGridHint" data-i18n="scanMultiHint">超過 2 個酵素時，圖表只會畫出「X 軸酵素 × Y 軸酵素」這兩軸的熱力圖，其餘酵素用下方的下拉選單挑一個固定值當切片看；總格點數（各酵素數值個數相乘）上限 2000，太多會跑很久或直接被拒絕。</p>
+      </div>
+
+      <div class="field-group" id="inductionFieldGroup">
+        <h2 class="field-group__title" data-i18n="inductionTitle">誘導與生長設定</h2>
+        <div class="field" id="inducedField">
+          <label for="induced" data-i18n="inducedLabel">誘導狀態</label>
+          <select id="induced">
+            <option value="true" data-i18n="inducedTrue">已加 IPTG（誘導後）</option>
+            <option value="false" data-i18n="inducedFalse">未誘導</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="iptgTime" data-i18n="iptgTimeLabel">IPTG 加入時間 (h)</label>
+          <input type="number" id="iptgTime" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="minGrowthFrac" data-i18n="minGrowthFracLabel">誘導後最低生長比例</label>
+          <input type="number" id="minGrowthFrac" step="0.01" min="0" max="1">
+        </div>
+        <div class="field" id="durationField">
+          <label for="totalTime" data-i18n="totalTimeLabel">模擬總時長 (h)</label>
+          <input type="number" id="totalTime" step="0.5" min="0.5">
+        </div>
+        <div class="field" id="stepModeField">
+          <label for="stepMode" data-i18n="stepModeLabel">dFBA 時間步長方法</label>
+          <select id="stepMode">
+            <option value="fixed" data-i18n="stepModeFixed">固定步長（對照 MATLAB 參考結果）</option>
+            <option value="adaptive" data-i18n="stepModeAdaptive">自適應步長（較快，數值不逐位對齊）</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="checkbox-field" id="compareField" hidden>
+        <input type="checkbox" id="compareToggle">
+        <label for="compareToggle" data-i18n="compareToggleLabel">保留先前結果疊加比較</label>
+      </div>
+
+      <button class="run-btn" id="runBtn">
+        <span id="runBtnLabel">執行 FBA</span>
+      </button>
+
+      <div class="btn-row" id="compareClearRow" style="margin-top: 8px;" hidden>
+        <button class="btn-sm" id="compareClearBtn" data-i18n="compareClear">清除疊加結果</button>
+      </div>
+
+      <p class="hint" id="statusHint"></p>
+    </section>
