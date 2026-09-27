@@ -38,6 +38,30 @@ Manual scan, auto-optimize, and multi-enzyme scan all run through a shared worke
 
 Technical notes for anyone working on the codebase.
 
+### Project structure
+
+```
+.
+├── assets/                  # Static assets (images, styling resources)
+├── backend/                  # Flask/Python server: routes, solver logic
+├── frontend/                  # Web UI: HTML/CSS/JS for Simple & Advanced modes
+├── models/                    # Genome-scale model files (iEC1356_Bl21DE3, etc.)
+├── limonene_predictor.py       # Surrogate quick-estimate model
+├── limonene_model.json          # Pre-fitted surrogate model parameters
+├── LIM009_params.csv             # Reference/validation parameter set
+├── main.py                        # Entry point — starts the local server
+├── requirements.txt                # Python dependencies
+└── .gitignore
+```
+
+### Features
+
+- Simple mode: instant surrogate-equation estimate, mobile/desktop friendly, no install
+- Advanced mode: live COBRApy solves for FBA, dFBA, Etot Analysis, Multi-Enzyme Scan
+- Presets, run history, and shareable results for every analysis
+- CSV / image export on every results panel
+- Chinese / English toggle, light/dark theme
+
 ### Getting Started
 
 #### Use Simple Mode Online
